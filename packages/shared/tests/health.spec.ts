@@ -8,6 +8,7 @@ describe('calcBmi', () => {
   it('throws on zero height', () => {
     expect(() => calcBmi(70, 0)).toThrow();
   });
+  it('throws on negative height', () => expect(() => calcBmi(70, -1)).toThrow());
 });
 
 describe('bmiCategory', () => {
@@ -21,6 +22,7 @@ describe('bmiCategory', () => {
   });
   it('boundary 18.5 is normal', () => expect(bmiCategory(18.5)).toBe('normal'));
   it('boundary 25 is overweight', () => expect(bmiCategory(25)).toBe('overweight'));
+  it('boundary 30 is obese', () => expect(bmiCategory(30)).toBe('obese'));
 });
 
 describe('calcDailyCalories', () => {
@@ -35,6 +37,11 @@ describe('calcDailyCalories', () => {
     const f = calcDailyCalories({ gender: 'female', age: 30, heightCm: 170, weightKg: 70, frequency: 'light', goal: 'maintain' });
     expect(f).toBeLessThan(m);
   });
+  it('gain_muscle applies a surplus vs maintain', () => {
+    const base = { gender: 'male', age: 30, heightCm: 180, weightKg: 80, frequency: 'moderate' } as const;
+    const maintain = calcDailyCalories({ ...base, goal: 'maintain' });
+    expect(calcDailyCalories({ ...base, goal: 'gain_muscle' })).toBe(maintain + 500);
+  });
 });
 
 describe('predictTargetDate', () => {
@@ -45,5 +52,11 @@ describe('predictTargetDate', () => {
   });
   it('delta 0 returns from date', () => {
     expect(predictTargetDate(70, 70, from).getTime()).toBe(from.getTime());
+  });
+  it('handles weight-gain direction (target > current)', () => {
+    const from = new Date('2026-01-01T00:00:00Z');
+    const d = predictTargetDate(70, 75, from);
+    expect(d.getTime()).toBeGreaterThan(from.getTime());
+    expect(d.toISOString().slice(0, 10)).toBe('2026-03-12'); // 5kg -> 70 days, same as lose case
   });
 });
