@@ -28,7 +28,7 @@ export const submitSchema = z.object({
   weight_kg,
   target_weight_kg,
   workout_frequency: z.enum(WORKOUT_FREQUENCIES),
-});
+}).strict();
 
 export type StepUpdate = z.infer<typeof stepUpdateSchema>;
 export type AssessmentInput = z.infer<typeof submitSchema>;

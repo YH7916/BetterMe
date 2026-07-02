@@ -16,6 +16,16 @@ describe('stepUpdateSchema', () => {
   it('rejects unknown enum', () => {
     expect(stepUpdateSchema.safeParse({ gender: 'x' }).success).toBe(false);
   });
+  it('rejects unknown keys', () => {
+    expect(stepUpdateSchema.safeParse({ unknownField: 'x' }).success).toBe(false);
+  });
+  it.each([
+    ['age', 12], ['age', 121],
+    ['weight_kg', 19], ['weight_kg', 501],
+    ['target_weight_kg', 19], ['target_weight_kg', 501],
+  ])('rejects out-of-range %s = %d', (field, value) => {
+    expect(stepUpdateSchema.safeParse({ [field]: value }).success).toBe(false);
+  });
 });
 
 describe('submitSchema', () => {
@@ -28,5 +38,12 @@ describe('submitSchema', () => {
       height_cm: 165, weight_kg: 70, target_weight_kg: 60, workout_frequency: 'light',
     });
     expect(r.success).toBe(true);
+  });
+  it('rejects unknown keys', () => {
+    expect(submitSchema.safeParse({
+      gender: 'female', primary_goal: 'lose_weight', age: 28,
+      height_cm: 165, weight_kg: 70, target_weight_kg: 60, workout_frequency: 'light',
+      unknownField: 'x',
+    }).success).toBe(false);
   });
 });
