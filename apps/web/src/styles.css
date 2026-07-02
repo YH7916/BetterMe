@@ -1,0 +1,4 @@
+:root { font-family: system-ui, sans-serif; }
+body { margin: 0; background: #f7f8fa; color: #1a1a1a; }
+.container { max-width: 480px; margin: 0 auto; padding: 24px; }
+button { cursor: pointer; }
