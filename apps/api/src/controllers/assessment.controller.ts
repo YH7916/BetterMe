@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
-import type { StepUpdate } from '@betterme/shared';
+import { stepUpdateSchema } from '@betterme/shared';
 import { assessmentService } from '../services/assessment.service';
+import { AppError } from '../lib/errors';
 import type { AppVariables } from '../app';
 
 type AppContext = Context<{ Variables: AppVariables }>;
@@ -26,12 +27,12 @@ export const assessmentController = {
     return c.json(await assessmentService.start(), 201);
   },
   async get(c: AppContext) {
-    const a = await assessmentService.getProgress(c.req.param('id'));
-    return c.json(toProgressDTO(a));
+    return c.json(toProgressDTO(c.get('assessment')!));
   },
   async patch(c: AppContext) {
-    const body = c.get('body') as StepUpdate;
+    const body = stepUpdateSchema.parse(c.get('body'));
     const a = await assessmentService.saveStep(c.req.param('id'), body);
-    return c.json(toProgressDTO(a!));
+    if (!a) throw AppError.notFound('assessment not found');
+    return c.json(toProgressDTO(a));
   },
 };

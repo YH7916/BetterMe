@@ -46,6 +46,7 @@ describe('assessment persistence & recovery', () => {
     const body = await res.json();
     expect(body.age).toBe(30);
     expect(body.gender).toBe('female');
+    expect(body.current_step).toBe(2);
   });
 
   it('rejects invalid values (400)', async () => {
@@ -58,5 +59,17 @@ describe('assessment persistence & recovery', () => {
     const { assessmentId } = await start();
     const res = await app.request(`/api/assessments/${assessmentId}`, { headers: h('00000000-0000-0000-0000-000000000000') });
     expect(res.status).toBe(403);
+  });
+
+  it('blocks access when x-user-id header is absent (403)', async () => {
+    const { assessmentId } = await start();
+    const res = await app.request(`/api/assessments/${assessmentId}`);
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 for a nonexistent assessment', async () => {
+    const id = '00000000-0000-0000-0000-000000000000';
+    const res = await app.request(`/api/assessments/${id}`, { headers: h(id) });
+    expect(res.status).toBe(404);
   });
 });
