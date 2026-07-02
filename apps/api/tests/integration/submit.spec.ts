@@ -25,10 +25,24 @@ describe('submit', () => {
     const { userId, assessmentId } = await fullAssessment();
     const res = await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
     expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('completed');
     const stored = await prisma.assessmentResult.findUnique({ where: { assessmentId } });
     expect(stored).not.toBeNull();
     expect(Number(stored!.bmi)).toBeCloseTo(25.71, 1);
     expect(stored!.bmiCategory).toBe('overweight');
+    expect(Number(stored!.bmi)).toBeCloseTo(25.71, 2);
+    expect(stored!.dailyCalorieIntake).toBeGreaterThan(0);
+    expect(stored!.algorithmVersion).toBe('v1');
+    expect(stored!.targetDate).toBeInstanceOf(Date);
+  });
+  it('is idempotent on re-submit (no duplicate result row)', async () => {
+    const { userId, assessmentId } = await fullAssessment();
+    await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
+    const res2 = await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
+    expect(res2.status).toBe(200);
+    const rows = await prisma.assessmentResult.findMany({ where: { assessmentId } });
+    expect(rows).toHaveLength(1);
   });
   it('rejects submit with incomplete data (400)', async () => {
     const { userId, assessmentId } = await (async () => {
