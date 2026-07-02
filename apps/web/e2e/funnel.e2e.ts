@@ -28,9 +28,15 @@ test('funnel to paywall to unlock', async ({ page }) => {
   // Result page: should be masked (paywall visible)
   await expect(page.getByText(/解锁|升级|unlock/i).first()).toBeVisible();
 
+  // Negative assertion: protected calorie field must NOT be visible in masked state
+  await expect(page.getByText(/每日建议摄入/i)).not.toBeVisible();
+
   // Pay to unlock
   await page.getByRole('button', { name: /支付|解锁|pay/i }).click();
 
   // Full result should now be visible (after pay + reload from live DB)
-  await expect(page.getByText(/每日建议摄入|daily/i)).toBeVisible();
+  await expect(page.getByText(/每日建议摄入/i)).toBeVisible();
+  // Assert actual calorie value renders (number in <b> node + "kcal" text)
+  await expect(page.getByText(/kcal/i)).toBeVisible();
+  await expect(page.getByText(/\d{3,4}/).first()).toBeVisible();
 });
