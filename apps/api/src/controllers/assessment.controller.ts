@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { stepUpdateSchema } from '@betterme/shared';
 import { assessmentService } from '../services/assessment.service';
 import { AppError } from '../lib/errors';
+import { resultService } from '../services/result.service';
 import type { AppVariables } from '../app';
 
 type AppContext = Context<{ Variables: AppVariables }>;
@@ -37,5 +38,9 @@ export const assessmentController = {
   },
   async submit(c: AppContext) {
     return c.json(await assessmentService.submit(c.req.param('id')));
+  },
+  async result(c: AppContext) {
+    const userId = c.req.header('x-user-id')!;
+    return c.json(await resultService.getResult(c.req.param('id'), userId));
   },
 };
