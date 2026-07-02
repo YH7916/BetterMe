@@ -11,5 +11,9 @@ export default defineConfig({
     // give DB-backed tests and their beforeEach hooks generous timeouts.
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Run test files sequentially to avoid concurrent writes to the shared
+    // remote test schema interfering with each other (resetDb in one file
+    // would race with reads/writes in another).
+    fileParallelism: false,
   },
 });
