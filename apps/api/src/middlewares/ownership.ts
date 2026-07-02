@@ -4,7 +4,7 @@ import { assessmentRepo } from '../repositories/assessment.repository';
 import type { AppVariables } from '../app';
 
 export async function requireOwnership(c: Context<{ Variables: AppVariables }>, next: Next) {
-  const id = c.req.param('id');
+  const id = c.req.param('id') ?? '';
   const userId = c.req.header('x-user-id');
   const a = await assessmentRepo.findById(id);
   if (!a) throw AppError.notFound('assessment not found');

@@ -1,4 +1,5 @@
 import type { StepUpdate } from '@betterme/shared';
+import type { ProgressResponse } from '@betterme/shared';
 import type { ResultResponse } from '../features/result/types';
 import { getUserId } from './session';
 
@@ -14,7 +15,7 @@ async function req<T = unknown>(path: string, init: RequestInit = {}): Promise<T
 
 export const api = {
   createAssessment: () => req<{ userId: string; assessmentId: string; currentStep: number }>('/assessments', { method: 'POST' }),
-  getProgress: (id: string) => req<Record<string, unknown>>(`/assessments/${id}`),
+  getProgress: (id: string) => req<ProgressResponse>(`/assessments/${id}`),
   saveStep: (id: string, data: StepUpdate) => req<Record<string, unknown>>(`/assessments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   submit: (id: string) => req<{ status: string }>(`/assessments/${id}/submit`, { method: 'POST' }),
   getResult: (id: string) => req<ResultResponse>(`/assessments/${id}/result`),

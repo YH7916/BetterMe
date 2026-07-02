@@ -8,6 +8,7 @@ import type { ResultResponse } from '../features/result/types';
 export function ResultPage() {
   const [state, setState] = useState<ResultResponse | null>(null);
   const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
   const id = getAssessmentId();
 
   async function load() {
@@ -23,9 +24,15 @@ export function ResultPage() {
     const userId = getUserId();
     if (!id || !userId) return;
     setPaying(true);
-    await api.pay(userId, id);
-    await load();
-    setPaying(false);
+    setPayError(null);
+    try {
+      await api.pay(userId, id);
+      await load();
+    } catch (err) {
+      setPayError(err instanceof Error ? err.message : '支付失败，请重试。');
+    } finally {
+      setPaying(false);
+    }
   }
 
   if (!state) return <div className="container">加载中…</div>;
@@ -34,6 +41,7 @@ export function ResultPage() {
     <>
       <ResultView data={state} />
       {!state.member && <Paywall onPay={() => void pay()} loading={paying} />}
+      {payError && <p style={{ color: 'red', textAlign: 'center' }}>{payError}</p>}
     </>
   );
 }

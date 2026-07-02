@@ -20,9 +20,17 @@ export function useFunnel() {
         const existing = getAssessmentId();
         if (existing) {
           const p = await api.getProgress(existing);
-          setData(p);
-          const currentStep = typeof p.current_step === 'number' ? p.current_step : 0;
-          setStep(currentStep);
+          const { assessmentId: _aid, userId: _uid, current_step, status: _st, ...stepFields } = p;
+          setData({
+            gender: stepFields.gender ?? undefined,
+            primary_goal: stepFields.primary_goal ?? undefined,
+            age: stepFields.age ?? undefined,
+            height_cm: stepFields.height_cm ?? undefined,
+            weight_kg: stepFields.weight_kg ?? undefined,
+            target_weight_kg: stepFields.target_weight_kg ?? undefined,
+            workout_frequency: stepFields.workout_frequency ?? undefined,
+          });
+          setStep(current_step);
         } else {
           const s = await api.createAssessment();
           setUserId(s.userId);

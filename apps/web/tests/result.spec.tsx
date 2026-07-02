@@ -34,10 +34,9 @@ describe('ResultPage', () => {
   it('shows paywall then full result after pay', async () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
-    // Paywall / locked state is shown (multiple elements may match — use getAllByText)
+    // Paywall button is present and not disabled
     await waitFor(() => {
-      const els = screen.getAllByText(/升级|解锁|unlock/i);
-      expect(els.length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: /支付|解锁|pay/i })).not.toBeDisabled();
     });
 
     // Protected value NOT rendered in masked state
