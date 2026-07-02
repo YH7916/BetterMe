@@ -6,5 +6,10 @@ export default defineConfig({
     // already set when the PrismaClient singleton is created.
     setupFiles: ['./tests/setup.ts'],
     environment: 'node',
+    // Integration tests hit a remote Supabase (ap-southeast-2). Connection
+    // setup + per-test resetDb round-trips exceed Vitest's 5s default, so
+    // give DB-backed tests and their beforeEach hooks generous timeouts.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
 });
