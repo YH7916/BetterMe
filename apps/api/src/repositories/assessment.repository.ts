@@ -2,9 +2,13 @@ import { prisma } from '../lib/prisma';
 import type { StepUpdate } from '@betterme/shared';
 
 function mapPatch(data: StepUpdate) {
-  const { primary_goal, height_cm, weight_kg, target_weight_kg, workout_frequency, current_step, ...rest } = data;
+  const {
+    gender, age, primary_goal, height_cm, weight_kg,
+    target_weight_kg, workout_frequency, current_step,
+  } = data;
   return {
-    ...rest,
+    ...(gender !== undefined && { gender }),
+    ...(age !== undefined && { age }),
     ...(primary_goal !== undefined && { primaryGoal: primary_goal }),
     ...(height_cm !== undefined && { heightCm: height_cm }),
     ...(weight_kg !== undefined && { weightKg: weight_kg }),
