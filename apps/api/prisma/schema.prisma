@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Gender {
+  male
+  female
+}
+
+enum Goal {
+  lose_weight
+  gain_muscle
+  maintain
+}
+
+enum WorkoutFrequency {
+  sedentary
+  light
+  moderate
+  active
+}
+
+enum BmiCategory {
+  underweight
+  normal
+  overweight
+  obese
+}
+
+enum AssessmentStatus {
+  in_progress
+  completed
+}
+
+enum SubscriptionStatus {
+  inactive
+  active
+}
+
+model User {
+  id            String        @id @default(uuid())
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  assessments   Assessment[]
+  subscription  Subscription?
+
+  @@map("users")
+}
+
+model Assessment {
+  id                String            @id @default(uuid())
+  userId            String            @map("user_id")
+  user              User              @relation(fields: [userId], references: [id])
+  gender            Gender?
+  primaryGoal       Goal?             @map("primary_goal")
+  age               Int?
+  heightCm          Decimal?          @map("height_cm")
+  weightKg          Decimal?          @map("weight_kg")
+  targetWeightKg    Decimal?          @map("target_weight_kg")
+  workoutFrequency  WorkoutFrequency? @map("workout_frequency")
+  currentStep       Int               @default(0) @map("current_step")
+  status            AssessmentStatus  @default(in_progress)
+  result            AssessmentResult?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("assessments")
+}
+
+model AssessmentResult {
+  id                 String      @id @default(uuid())
+  assessmentId       String      @unique @map("assessment_id")
+  assessment         Assessment  @relation(fields: [assessmentId], references: [id])
+  bmi                Decimal
+  bmiCategory        BmiCategory @map("bmi_category")
+  dailyCalorieIntake Int         @map("daily_calorie_intake")
+  targetDate         DateTime    @map("target_date") @db.Date
+  algorithmVersion   String      @map("algorithm_version")
+  createdAt          DateTime    @default(now()) @map("created_at")
+
+  @@map("assessment_results")
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  userId      String             @unique @map("user_id")
+  user        User               @relation(fields: [userId], references: [id])
+  status      SubscriptionStatus @default(inactive)
+  plan        String?
+  activatedAt DateTime?          @map("activated_at")
+  paymentRef  String?            @map("payment_ref")
+
+  @@map("subscriptions")
+}
