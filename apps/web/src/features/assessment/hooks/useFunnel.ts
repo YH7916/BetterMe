@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { StepData } from '../../../store/funnel';
 import { api } from '../../../lib/api-client';
@@ -8,21 +8,29 @@ export function useFunnel() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<StepData>({});
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const initiated = useRef(false);
   const nav = useNavigate();
 
   useEffect(() => {
+    if (initiated.current) return;
+    initiated.current = true;
     (async () => {
-      const existing = getAssessmentId();
-      if (existing) {
-        const p = await api.getProgress(existing);
-        setData(p);
-        setStep(p.current_step ?? 0);
-      } else {
-        const s = await api.createAssessment();
-        setUserId(s.userId);
-        setAssessmentId(s.assessmentId);
+      try {
+        const existing = getAssessmentId();
+        if (existing) {
+          const p = await api.getProgress(existing);
+          setData(p);
+          setStep(p.current_step ?? 0);
+        } else {
+          const s = await api.createAssessment();
+          setUserId(s.userId);
+          setAssessmentId(s.assessmentId);
+        }
+        setReady(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '初始化失败，请检查网络后重试。');
       }
-      setReady(true);
     })();
   }, []);
 
@@ -39,5 +47,5 @@ export function useFunnel() {
     }
   }
 
-  return { step, data, ready, next, userId: getUserId() };
+  return { step, data, ready, error, next, userId: getUserId() };
 }
