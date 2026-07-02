@@ -21,7 +21,8 @@ export function useFunnel() {
         if (existing) {
           const p = await api.getProgress(existing);
           setData(p);
-          setStep(p.current_step ?? 0);
+          const currentStep = typeof p.current_step === 'number' ? p.current_step : 0;
+          setStep(currentStep);
         } else {
           const s = await api.createAssessment();
           setUserId(s.userId);
