@@ -2,9 +2,10 @@ import type { StepUpdate } from '@betterme/shared';
 import { getUserId } from './session';
 
 async function req(path: string, init: RequestInit = {}) {
+  const uid = getUserId();
   const res = await fetch(`/api${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(getUserId() ? { 'x-user-id': getUserId()! } : {}), ...init.headers },
+    headers: { 'content-type': 'application/json', ...(uid ? { 'x-user-id': uid } : {}), ...init.headers },
   });
   if (!res.ok) throw new Error((await res.json()).error?.message ?? 'request failed');
   return res.json();
