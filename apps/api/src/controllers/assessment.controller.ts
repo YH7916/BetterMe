@@ -40,7 +40,7 @@ export const assessmentController = {
     return c.json(await assessmentService.submit(c.req.param('id')));
   },
   async result(c: AppContext) {
-    const userId = c.req.header('x-user-id')!;
-    return c.json(await resultService.getResult(c.req.param('id'), userId));
+    const assessment = c.get('assessment')!;
+    return c.json(await resultService.getResult(c.req.param('id'), assessment.userId));
   },
 };

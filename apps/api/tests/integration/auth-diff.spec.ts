@@ -26,9 +26,10 @@ describe('differentiated result & pay unlock', () => {
     const body = await res.json();
     expect(body.member).toBe(false);
     expect(body.result.bmi).toBeDefined();
-    expect(body.result.daily_calorie_intake).toBeUndefined();
-    expect(body.result.target_date).toBeUndefined();
+    expect(body.result).not.toHaveProperty('daily_calorie_intake');
+    expect(body.result).not.toHaveProperty('target_date');
     expect(body.result.locked).toBe(true);
+    expect(typeof body.result.message).toBe('string');
   });
 
   it('after /pay the same result becomes full', async () => {
@@ -41,5 +42,16 @@ describe('differentiated result & pay unlock', () => {
     expect(body.result.daily_calorie_intake).toBeGreaterThan(0);
     expect(body.result.target_date).toBeDefined();
     expect(body.result.locked).toBeUndefined();
+    expect(body.result.algorithm_version).toBeDefined();
+  });
+
+  it('rejects paying for another user (403)', async () => {
+    const { userId, assessmentId } = await completed();
+    const res = await app.request('/api/pay', {
+      method: 'POST',
+      headers: h(userId),
+      body: JSON.stringify({ userId: '00000000-0000-0000-0000-000000000000', assessmentId }),
+    });
+    expect(res.status).toBe(403);
   });
 });
