@@ -9,3 +9,4 @@ export const assessmentRoutes = new Hono<{ Variables: AppVariables }>();
 assessmentRoutes.post('/', assessmentController.create);
 assessmentRoutes.get('/:id', requireOwnership, assessmentController.get);
 assessmentRoutes.patch('/:id', requireOwnership, validateBody(stepUpdateSchema), assessmentController.patch);
+assessmentRoutes.post('/:id/submit', requireOwnership, assessmentController.submit);

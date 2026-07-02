@@ -35,4 +35,7 @@ export const assessmentController = {
     if (!a) throw AppError.notFound('assessment not found');
     return c.json(toProgressDTO(a));
   },
+  async submit(c: AppContext) {
+    return c.json(await assessmentService.submit(c.req.param('id')));
+  },
 };
