@@ -2,6 +2,19 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Idempotency guard: check if seed user already exists
+  const existingUser = await prisma.user.findFirst({
+    where: { subscription: { paymentRef: 'seed-paid' } },
+    include: { assessments: true },
+  });
+
+  if (existingUser) {
+    console.log('Seed user already exists — skipping creation.');
+    console.log('PAID_TEST_USER_ID=', existingUser.id);
+    console.log('PAID_TEST_ASSESSMENT_ID=', existingUser.assessments[0]?.id);
+    return;
+  }
+
   const paidUser = await prisma.user.create({
     data: {
       subscription: { create: { status: 'active', plan: 'pro', activatedAt: new Date(), paymentRef: 'seed-paid' } },
@@ -13,7 +26,7 @@ async function main() {
           result: {
             create: {
               bmi: 25.71, bmiCategory: 'overweight', dailyCalorieIntake: 1680,
-              targetDate: new Date('2026-06-01'), algorithmVersion: 'v1',
+              targetDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000), algorithmVersion: 'v1',
             },
           },
         },
