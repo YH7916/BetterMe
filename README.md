@@ -331,7 +331,7 @@ Returns the computed result. Shape differs by subscription status.
     "bmi": 25.7,
     "bmi_category": "overweight",
     "daily_calorie_intake": 1680,
-    "target_date": "2026-06-01",
+    "target_date": "<computed YYYY-MM-DD>",
     "algorithm_version": "v1"
   }
 }

@@ -208,7 +208,7 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
     "bmi": 25.71,
     "bmi_category": "overweight",
     "daily_calorie_intake": 1680,
-    "target_date": "2026-06-01",
+    "target_date": "<computed YYYY-MM-DD>",
     "algorithm_version": "v1"
   }
 }

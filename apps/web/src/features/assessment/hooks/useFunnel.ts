@@ -21,6 +21,10 @@ export function useFunnel() {
         if (existing) {
           const p = await api.getProgress(existing);
           const { assessmentId: _aid, userId: _uid, current_step, status: _st, ...stepFields } = p;
+          if (_st === 'completed' || current_step >= 4) {
+            nav('/result');
+            return;
+          }
           setData({
             gender: stepFields.gender ?? undefined,
             primary_goal: stepFields.primary_goal ?? undefined,
