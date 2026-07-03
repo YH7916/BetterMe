@@ -1,0 +1,28 @@
+name = "betterme-api"
+main = "src/worker.ts"
+compatibility_date = "2024-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# ────────────────────────────────────────────────────────────────────────────
+# OPTIONAL deployment path: Cloudflare Workers
+# ────────────────────────────────────────────────────────────────────────────
+# The PRIMARY recommended backend deployment is a Node host (Render / Railway
+# free tier) using apps/api/src/server.ts — zero Prisma changes, rock-solid
+# with Supabase, and the test suite runs against the same code path.
+#
+# Workers deployment additionally requires:
+#   1. Add to apps/api/prisma/schema.prisma generator block:
+#        previewFeatures = ["driverAdapters"]
+#   2. Install:  pnpm --filter @betterme/api add @prisma/adapter-pg pg
+#   3. Update apps/api/src/lib/prisma.ts to use PrismaPg adapter pointing
+#      at the Supabase pooler (port 6543).
+#   4. Set secret via Wrangler:
+#        wrangler secret put DATABASE_URL   # Supabase pooler :6543
+#        wrangler secret put DIRECT_URL     # Supabase direct :5432
+#
+# Build & deploy (after account setup):
+#   pnpm --filter @betterme/api exec wrangler deploy
+#
+# Health check:
+#   curl https://betterme-api.<your-subdomain>.workers.dev/api/health
+# ────────────────────────────────────────────────────────────────────────────

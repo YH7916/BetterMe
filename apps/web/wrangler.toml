@@ -1,0 +1,33 @@
+# Cloudflare Pages — betterme web frontend
+# ─────────────────────────────────────────────────────────────────────────────
+# This file documents the Pages project settings. In practice, Cloudflare Pages
+# is best configured via the Dashboard (Settings → Build & Deploy) or the
+# wrangler pages deploy CLI, but the values below can also be committed as
+# project config for reference.
+#
+# Build settings (enter in Cloudflare Pages Dashboard or pass to wrangler):
+#   Build command:  pnpm --filter @betterme/web build
+#   Output dir:     apps/web/dist
+#
+# Environment variables (set in Dashboard → Settings → Environment variables):
+#   VITE_API_BASE   =  https://betterme-api.<your-subdomain>.workers.dev
+#                      (or your Render/Railway backend URL if using Node host)
+#
+# Deploy commands (after `wrangler login`):
+#   # First deploy (creates project):
+#   pnpm --filter @betterme/web build
+#   npx wrangler pages project create betterme-web
+#   npx wrangler pages deploy apps/web/dist --project-name betterme-web
+#
+#   # Subsequent deploys:
+#   pnpm --filter @betterme/web build
+#   npx wrangler pages deploy apps/web/dist --project-name betterme-web
+# ─────────────────────────────────────────────────────────────────────────────
+
+[build]
+command = "pnpm --filter @betterme/web build"
+output_directory = "apps/web/dist"
+
+[env.production.vars]
+# Override VITE_API_BASE in the Cloudflare Dashboard — do not commit real URLs here
+VITE_API_BASE = ""
