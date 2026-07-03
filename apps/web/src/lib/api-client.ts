@@ -3,9 +3,11 @@ import type { ProgressResponse } from '@betterme/shared';
 import type { ResultResponse } from '../features/result/types';
 import { getUserId } from './session';
 
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+
 async function req<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const uid = getUserId();
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...(uid ? { 'x-user-id': uid } : {}), ...init.headers },
   });

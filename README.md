@@ -451,6 +451,7 @@ Render and Railway both offer a free tier that runs the existing `apps/api/src/s
 4. Add environment variables in Render's dashboard:
    - `DATABASE_URL` — Supabase pooler URL (`?schema=public`)
    - `DIRECT_URL` — Supabase direct URL
+   - `WEB_ORIGIN` — *(optional)* your Cloudflare Pages domain (e.g. `https://betterme.pages.dev`) to restrict CORS. Defaults to `*` (safe — auth uses `x-user-id` header, no cookies/credentials).
 5. Deploy. Note your public URL (e.g. `https://betterme-api.onrender.com`).
 6. Health check: `curl https://betterme-api.onrender.com/api/health`
 
@@ -484,8 +485,9 @@ Workers deployment requires additional Prisma configuration (driver adapter). Se
    - **Framework preset:** None
    - **Build command:** `pnpm --filter @betterme/web build`
    - **Build output directory:** `apps/web/dist`
-4. Add environment variable: `VITE_API_BASE` = `https://your-backend-url`
-5. Deploy.
+4. Add environment variable: `VITE_API_BASE` = `https://your-backend-url` (set at **build time** — Vite bakes this into the bundle)
+5. *(Optional)* On the backend, set `WEB_ORIGIN` = your Pages domain to restrict CORS (e.g. `https://betterme.pages.dev`).
+6. Deploy.
 
 **Option B — Wrangler CLI:**
 ```bash
