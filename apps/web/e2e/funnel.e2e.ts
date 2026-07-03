@@ -28,15 +28,17 @@ test('funnel to paywall to unlock', async ({ page }) => {
   // Result page: should be masked (paywall visible)
   await expect(page.getByText(/解锁|升级|unlock/i).first()).toBeVisible();
 
-  // Negative assertion: protected calorie field must NOT be visible in masked state
-  await expect(page.getByText(/每日建议摄入/i)).not.toBeVisible();
+  // Negative assertion: "kcal" unit only appears in the unlocked member result,
+  // never in the paywall teaser copy — so it is the correct masking discriminator.
+  await expect(page.getByText(/kcal/i)).not.toBeVisible();
 
   // Pay to unlock
   await page.getByRole('button', { name: /支付|解锁|pay/i }).click();
 
+  // Wait for paywall to disappear (pay API + reload must complete before asserting)
+  await expect(page.getByText(/解锁你的完整计划/i)).not.toBeVisible({ timeout: 30_000 });
+
   // Full result should now be visible (after pay + reload from live DB)
-  await expect(page.getByText(/每日建议摄入/i)).toBeVisible();
-  // Assert actual calorie value renders (number in <b> node + "kcal" text)
   await expect(page.getByText(/kcal/i)).toBeVisible();
   await expect(page.getByText(/\d{3,4}/).first()).toBeVisible();
 });
