@@ -44,6 +44,8 @@ erDiagram
         text plan "nullable"
         timestamp activated_at "nullable"
         text payment_ref "nullable"
+        timestamp created_at
+        timestamp updated_at
     }
 
     users ||--o{ assessments : "has"

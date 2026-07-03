@@ -248,6 +248,7 @@ Returns current progress for resume. Requires `x-user-id` header matching the as
 ```json
 {
   "assessmentId": "ef0e9e76-...",
+  "userId": "8404579c-...",
   "gender": "female",
   "primary_goal": "lose_weight",
   "age": 28,
@@ -398,12 +399,17 @@ UID="8404579c-776a-44ec-a2fe-74389b54bcc1"
 # Member (paid) — returns daily_calorie_intake + target_date
 curl "$API/api/assessments/$AID/result" -H "x-user-id: $UID"
 
-# Non-member — create a fresh assessment then call result before paying
-NEW=$(curl -s -X POST "$API/api/assessments" | jq -r '.assessmentId')
-NEW_UID=$(curl -s -X POST "$API/api/assessments" | jq -r '.userId')
-# ... fill steps, submit, then:
+# Non-member — create a SINGLE fresh session, capture both IDs from that one response
+NEW_RESP=$(curl -s -X POST "$API/api/assessments")
+NEW=$(echo "$NEW_RESP" | jq -r '.assessmentId')
+NEW_UID=$(echo "$NEW_RESP" | jq -r '.userId')
+# fill funnel steps + submit
+curl -s -X PATCH "$API/api/assessments/$NEW" \
+  -H "content-type: application/json" -H "x-user-id: $NEW_UID" \
+  -d '{"gender":"female","primary_goal":"lose_weight","age":28,"height_cm":165,"weight_kg":70,"target_weight_kg":60,"workout_frequency":"light","current_step":4}'
+curl -s -X POST "$API/api/assessments/$NEW/submit" -H "x-user-id: $NEW_UID"
+# GET result as non-member: locked === true, daily_calorie_intake is absent
 curl "$API/api/assessments/$NEW/result" -H "x-user-id: $NEW_UID"
-# result.locked === true, daily_calorie_intake is absent
 ```
 
 ---

@@ -81,6 +81,7 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 ```json
 {
   "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
+  "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
   "gender": "female",
   "primary_goal": "lose_weight",
   "age": 28,
@@ -155,7 +156,7 @@ TDEE = BMR × activity_factor
 daily_calorie_intake = round(TDEE + goal_adjust)
   lose_weight: -500  |  gain_muscle: +500  |  maintain: 0
 
-target_date = today + ceil(|weight_kg - target_weight_kg| / 0.5) × 7 days
+target_date = today + round(|weight_kg - target_weight_kg| / 0.5) × 7 days
   (returns today if delta is 0)
 ```
 
@@ -268,7 +269,7 @@ curl http://localhost:8787/api/assessments/ef0e9e76-0322-45af-89cc-f4b785c7b264/
   -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1"
 ```
 
-**Replay /pay (idempotent — subscription is already active, upsert-style):**
+**Replay /pay (calling /pay when already active succeeds — re-sets the same active state — but it is a plain `update`, not an upsert):**
 ```bash
 curl -X POST http://localhost:8787/api/pay \
   -H "content-type: application/json" \
