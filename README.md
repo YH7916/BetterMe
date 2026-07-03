@@ -1,8 +1,6 @@
 # BetterMe 健康测评系统
 
-[![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/ci.yml)
-
-> **Note:** Replace `<owner>/<repo>` in the badge URL above with your GitHub username/org and repository name after pushing.
+[![CI](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml/badge.svg)](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml)
 
 A full-stack health assessment quiz funnel inspired by the BetterMe challenge. Users step through a guided form, the backend persists progress for recovery, computes a personalised health plan server-side, and returns differentiated results based on subscription status (free users see a masked teaser; members get the full plan). A mock `/pay` endpoint simulates a payment callback that unlocks the full result.
 
@@ -198,11 +196,11 @@ pnpm --filter @betterme/web e2e
 Requires both dev servers running (or Playwright auto-starts them via `webServer` in `playwright.config.ts`).
 Covers the complete funnel → submit → masked result → pay → full result unlock flow.
 
-### CI badge
+### CI
 
-![CI](https://github.com/<owner>/<repo>/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml/badge.svg)
 
-> After pushing to GitHub, replace `<owner>/<repo>` with your actual values. CI runs typecheck + all Vitest tests against a `postgres:16` service container.
+> CI runs typecheck + all Vitest tests against a `postgres:16` service container on every push and PR.
 
 ---
 
