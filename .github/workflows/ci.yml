@@ -10,10 +10,11 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test
+          POSTGRES_USER: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -30,7 +31,12 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        name: "Install dependencies"
       - run: pnpm --filter @betterme/api exec prisma migrate deploy
+        name: "Apply DB migrations"
       - run: pnpm --filter @betterme/api exec prisma generate
+        name: "Generate Prisma client"
       - run: pnpm typecheck
+        name: "Typecheck"
       - run: pnpm test
+        name: "Run tests"
