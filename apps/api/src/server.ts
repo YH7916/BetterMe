@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { createApp } from './app';
 
-serve({ fetch: createApp().fetch, port: 8787 });
-console.log('API on http://localhost:8787');
+const port = Number(process.env.PORT) || 8787;
+serve({ fetch: createApp().fetch, port });
+console.log(`API listening on port ${port}`);
