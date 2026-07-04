@@ -103,6 +103,30 @@ describe('ResultPage', () => {
     );
   });
 
+  it('waits for the final background save before fetching the result', async () => {
+    vi.mocked(client.api.getResult).mockReset();
+    vi.mocked(client.api.getResult).mockResolvedValueOnce(maskedResponse);
+    vi.spyOn(client.api, 'getProgress').mockResolvedValue({
+      assessmentId: 'a1',
+      userId: 'u1',
+      gender: 'female',
+      primary_goal: 'lose_weight',
+      age: 28,
+      height_cm: 165,
+      weight_kg: 70,
+      target_weight_kg: 60,
+      workout_frequency: 'light',
+      current_step: 3,
+      status: 'in_progress',
+    });
+
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
+
+    await waitFor(() => expect(client.api.getProgress).toHaveBeenCalledWith('a1'));
+    expect(screen.getByText(/正在生成结果|generating/i)).toBeTruthy();
+    expect(client.api.getResult).not.toHaveBeenCalled();
+  });
+
   it('keeps users on a generating state while a completed assessment result is not ready yet', async () => {
     let resolveResult: (value: ResultResponse) => void;
     vi.mocked(client.api.getResult).mockReset();

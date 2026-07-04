@@ -45,9 +45,14 @@ export function ResultPage() {
     if (queuedError) throw new Error(queuedError);
 
     const progress = await api.getProgress(assessmentId);
-    if (progress.current_step >= 4 && progress.status !== 'completed') {
-      await api.submit(assessmentId);
+    if (progress.status === 'completed') {
+      return true;
     }
+    if (progress.current_step < 4) {
+      return false;
+    }
+    await api.submit(assessmentId);
+    return true;
   }
 
   async function load({ preserveExisting = false }: { preserveExisting?: boolean } = {}) {
@@ -61,8 +66,12 @@ export function ResultPage() {
       }
 
       setLoadError(null);
-      await prepareResult(id);
+      const ready = await prepareResult(id);
       prepared = true;
+      if (!ready) {
+        setGenerating(true);
+        return 'pending' as const;
+      }
       const result = await api.getResult(id);
       setState(result);
       setGenerating(false);
