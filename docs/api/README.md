@@ -9,8 +9,7 @@ Full reference for all six `/api` endpoints. For a quick summary table see the r
 | Environment | URL |
 |---|---|
 | Local dev | `http://localhost:8787` |
-| Production (Node host) | `https://<your-render-or-railway-url>` |
-| Production (Workers) | `https://betterme-api.<subdomain>.workers.dev` |
+| Production (Railway Node host) | `https://api.betterme.yesterhaze.codes` |
 
 ---
 
@@ -104,7 +103,7 @@ Fields not yet set by the user are `null`. The frontend uses `current_step` to j
 
 Incrementally saves one or more fields. The body is validated against `stepUpdateSchema` (a `.partial()` Zod schema that allows any subset of the assessment fields). Fields not present in the body are left unchanged.
 
-The `current_step` field should be included in every PATCH to keep the server in sync with the frontend's active step index.
+The `current_step` field should be included in every PATCH to keep the server in sync with the frontend's active step index. The backend stores it monotonically with `GREATEST(current_step, incoming_step)`, so stale saves cannot move progress backward.
 
 **Request:**
 ```http
@@ -130,6 +129,11 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 | `target_weight_kg` | number | 20–500 |
 | `workout_frequency` | `"sedentary" \| "light" \| "moderate" \| "active"` | Enum |
 | `current_step` | integer | 0–10 |
+
+When `primary_goal`, `weight_kg`, and `target_weight_kg` are present in the same payload, `stepUpdateSchema` also checks goal/target consistency:
+
+- `lose_weight`: `target_weight_kg` must be below `weight_kg`
+- `gain_muscle`: `target_weight_kg` must be above `weight_kg`
 
 **Response 200:** updated progress object (same shape as GET /api/assessments/:id).
 
@@ -166,14 +170,14 @@ POST /api/assessments/ef0e9e76-0322-45af-89cc-f4b785c7b264/submit HTTP/1.1
 x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 ```
 
-No body required — data comes from the stored assessment.
+No body required — data comes from the stored assessment. `submitSchema` re-validates all required fields plus goal/target consistency, so logically contradictory data is rejected even if it arrived across multiple PATCH requests.
 
 **Response 200:**
 ```json
 { "status": "completed" }
 ```
 
-**Errors:** `400 INCOMPLETE` (missing required fields in stored assessment), `403`, `404`
+**Errors:** `400 INCOMPLETE` (missing required fields or contradictory target weight in stored assessment), `403`, `404`
 
 ---
 
@@ -222,7 +226,7 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 
 ### 6. POST /api/pay
 
-Simulates a payment callback that activates the caller's subscription. The `x-user-id` header is verified against `body.userId` in the controller — they must match. This prevents one user from unlocking another user's subscription.
+Simulates a payment callback that activates the caller's subscription. The `x-user-id` header is verified against `body.userId`, and `body.assessmentId` must belong to the same user. This prevents one user from unlocking another user's subscription or paying against another user's assessment.
 
 **Request:**
 ```http
@@ -236,7 +240,7 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 }
 ```
 
-The `assessmentId` field is required by `paySchema` (Zod) for future extensibility (per-assessment subscriptions). Currently only `userId` is used to activate the subscription.
+The `assessmentId` field is required by `paySchema` (Zod) and is checked against assessment ownership before the subscription is activated.
 
 The endpoint is idempotent for an already-active subscription: repeated calls return `{ "status": "active" }` without rewriting `payment_ref` or `activated_at`.
 
@@ -249,8 +253,8 @@ The endpoint is idempotent for an already-active subscription: repeated calls re
 
 **Errors:**
 - `400 VALIDATION_ERROR` — `userId` or `assessmentId` is not a valid UUID
-- `403 FORBIDDEN` — `x-user-id` header does not equal `body.userId`
-- `404 NOT_FOUND` — no subscription row exists for this user (the user was not created via `POST /api/assessments`)
+- `403 FORBIDDEN` — `x-user-id` header does not equal `body.userId`, or `assessmentId` belongs to another user
+- `404 NOT_FOUND` — no subscription row exists for this user, or the assessment does not exist
 
 ---
 
@@ -267,13 +271,13 @@ These IDs are in the `public` schema. The integration test `resetDb()` only clea
 
 **Get full (member) result:**
 ```bash
-curl http://localhost:8787/api/assessments/ef0e9e76-0322-45af-89cc-f4b785c7b264/result \
+curl https://api.betterme.yesterhaze.codes/api/assessments/ef0e9e76-0322-45af-89cc-f4b785c7b264/result \
   -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1"
 ```
 
 **Replay /pay (calling /pay when already active succeeds and keeps the existing activation metadata unchanged):**
 ```bash
-curl -X POST http://localhost:8787/api/pay \
+curl -X POST https://api.betterme.yesterhaze.codes/api/pay \
   -H "content-type: application/json" \
   -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1" \
   -d '{

@@ -53,4 +53,18 @@ describe('submit', () => {
     const res = await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
     expect(res.status).toBe(400);
   });
+  it('rejects submit when target weight contradicts the selected goal (400)', async () => {
+    const { userId, assessmentId } = await (await app.request('/api/assessments', { method: 'POST' })).json();
+    await app.request(`/api/assessments/${assessmentId}`, {
+      method: 'PATCH', headers: h(userId),
+      body: JSON.stringify({ gender: 'female', primary_goal: 'lose_weight', age: 28, height_cm: 165, weight_kg: 70, current_step: 3 }),
+    });
+    await app.request(`/api/assessments/${assessmentId}`, {
+      method: 'PATCH', headers: h(userId),
+      body: JSON.stringify({ target_weight_kg: 75, workout_frequency: 'light', current_step: 4 }),
+    });
+
+    const res = await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
+    expect(res.status).toBe(400);
+  });
 });

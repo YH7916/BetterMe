@@ -8,6 +8,26 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 
 ---
 
+## Live Delivery
+
+| Item | URL / Value |
+|---|---|
+| Frontend demo | https://betterme.yesterhaze.codes |
+| Frontend fallback | https://betterme-4j4.pages.dev |
+| Backend API | https://api.betterme.yesterhaze.codes |
+| Health check | https://api.betterme.yesterhaze.codes/api/health |
+| GitHub repository | https://github.com/YH7916/BetterMe |
+| CI | https://github.com/YH7916/BetterMe/actions/workflows/ci.yml |
+
+Production paid demo credentials:
+
+```bash
+PAID_TEST_USER_ID=8404579c-776a-44ec-a2fe-74389b54bcc1
+PAID_TEST_ASSESSMENT_ID=ef0e9e76-0322-45af-89cc-f4b785c7b264
+```
+
+---
+
 ## Architecture
 
 ```
@@ -18,7 +38,7 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 └───────────────────────────────┬─────────────────────────────────────┘
                                 │  /api/*  (Vite dev proxy / VITE_API_BASE)
 ┌───────────────────────────────▼─────────────────────────────────────┐
-│  Node host (Render / Railway) — RECOMMENDED                         │
+│  Railway Node service                                                │
 │  apps/api  (Hono + Prisma)                                          │
 │  routes → middlewares → controllers → services → repositories       │
 │  Optionally: Cloudflare Workers via src/worker.ts (see §Deployment) │
@@ -39,7 +59,7 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 | Layer | Choice |
 |---|---|
 | Frontend | Vite 5 + React 18 + React Router 6 + TypeScript |
-| Backend | Hono 4 + Node.js 20 + TypeScript (`strict: true`) |
+| Backend | Hono 4 + Node.js 22 + TypeScript (`strict: true`) |
 | ORM | Prisma 5 + Supabase Postgres |
 | Shared | Zod 3 contracts + health algorithm pure functions |
 | Unit/Integration Tests | Vitest 2 |
@@ -47,7 +67,7 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 | E2E Tests | Playwright |
 | CI | GitHub Actions |
 | Frontend Deploy | Cloudflare Pages |
-| Backend Deploy | Render / Railway (Node — recommended) or Cloudflare Workers (optional) |
+| Backend Deploy | Railway Node service |
 
 ---
 
@@ -190,9 +210,9 @@ This runs (in parallel across packages):
 
 | Package | Runner | What runs |
 |---|---|---|
-| `packages/shared` | Vitest | 30 unit tests — algorithm boundaries (BMI, calories, target-date) + Zod schema validation |
-| `apps/api` | Vitest | 19 integration tests against the `test` Supabase schema |
-| `apps/web` | Vitest + RTL | 22 component tests (session, funnel, result page, optimistic unlock, restart) |
+| `packages/shared` | Vitest | 34 unit tests — algorithm boundaries (BMI, calories, target-date) + Zod schema validation including target-weight direction |
+| `apps/api` | Vitest | 23 integration tests against the `test` schema |
+| `apps/web` | Vitest + RTL | 24 component tests (session, funnel, result page, optimistic unlock, restart) |
 
 For a demo-ready verification pass:
 
@@ -222,7 +242,15 @@ pnpm --filter @betterme/web e2e
 Requires both dev servers running (or Playwright auto-starts them via `webServer` in `playwright.config.ts`).
 Covers the complete funnel → submit → masked result → pay → full result unlock flow.
 
-### Interview demo flow
+### Online interview demo flow
+
+1. Open `https://betterme.yesterhaze.codes`.
+2. Complete the 4-step assessment. The UI advances immediately while saves continue in the background.
+3. On `/result`, show the masked BMI result and the simulated membership unlock.
+4. Click **模拟解锁会员 / Demo unlock**. Full result appears immediately and syncs with the backend.
+5. Click **重新开始 / Restart demo** to clear local demo session state and run the flow again.
+
+### Local interview demo flow
 
 1. Start with `pnpm dev`.
 2. Open `http://localhost:5173`.
@@ -318,6 +346,8 @@ Saves one or more fields incrementally. All fields are optional (partial update)
 
 **Validation ranges:** age 13–120, height_cm 50–260, weight_kg 20–500, target_weight_kg 20–500, current_step 0–10.
 
+**Goal/target consistency:** for `lose_weight`, `target_weight_kg` must be below `weight_kg`; for `gain_muscle`, `target_weight_kg` must be above `weight_kg`. The final submit path re-validates this against the stored assessment data.
+
 **Response 200:** updated progress object (same shape as GET).
 
 **Errors:** `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`
@@ -335,7 +365,7 @@ Triggers server-side health algorithm using the stored assessment fields. All fi
 { "status": "completed" }
 ```
 
-**Errors:** `400 INCOMPLETE` (missing required fields), `403 FORBIDDEN`, `404 NOT_FOUND`
+**Errors:** `400 INCOMPLETE` (missing required fields or contradictory target weight), `403 FORBIDDEN`, `404 NOT_FOUND`
 
 ---
 
@@ -378,7 +408,7 @@ The fields `daily_calorie_intake` and `target_date` are **never** sent to non-me
 
 ### 6. POST /api/pay
 
-Simulates a payment callback that activates the user's subscription. The `x-user-id` header **must equal** `body.userId` — a mismatch returns 403.
+Simulates a payment callback that activates the user's subscription. The `x-user-id` header **must equal** `body.userId`, and `body.assessmentId` must belong to that same user — a mismatch returns 403.
 
 The endpoint is idempotent for an already-active subscription: repeated calls return `active` without rewriting the original activation timestamp or payment reference.
 
@@ -395,14 +425,14 @@ The endpoint is idempotent for an already-active subscription: repeated calls re
 { "status": "active" }
 ```
 
-**Errors:** `400 VALIDATION_ERROR` (invalid UUID), `403 FORBIDDEN` (x-user-id ≠ body.userId), `404 NOT_FOUND` (user has no subscription row)
+**Errors:** `400 VALIDATION_ERROR` (invalid UUID), `403 FORBIDDEN` (x-user-id ≠ body.userId or assessment owner mismatch), `404 NOT_FOUND` (user/subscription/assessment not found)
 
 ---
 
 ### /pay cURL example
 
 ```bash
-API="http://localhost:8787"
+API="https://api.betterme.yesterhaze.codes"
 
 curl -X POST "$API/api/pay" \
   -H "content-type: application/json" \
@@ -427,7 +457,7 @@ PAID_TEST_ASSESSMENT_ID = ef0e9e76-0322-45af-89cc-f4b785c7b264
 **Compare masked vs full result:**
 
 ```bash
-API="http://localhost:8787"
+API="https://api.betterme.yesterhaze.codes"
 AID="ef0e9e76-0322-45af-89cc-f4b785c7b264"
 UID="8404579c-776a-44ec-a2fe-74389b54bcc1"
 
@@ -463,7 +493,7 @@ Before a real public launch:
 | Operations | Local logs + GitHub CI | Request logging, error tracking, uptime checks, DB backup/restore playbook |
 | Abuse/rate limits | Ownership checks + validation | API rate limiting and bot protection |
 
-For a polished but still demo-safe deployment, use Supabase + Render/Railway API + Cloudflare Pages frontend, then set `VITE_API_BASE` to the deployed API origin and optionally restrict `WEB_ORIGIN`.
+The current demo deployment uses Supabase Postgres + Railway API + Cloudflare Pages frontend, with `VITE_API_BASE=https://api.betterme.yesterhaze.codes` and `WEB_ORIGIN=https://betterme-4j4.pages.dev,https://betterme.yesterhaze.codes`.
 
 ---
 
@@ -488,27 +518,37 @@ For a polished but still demo-safe deployment, use Supabase + Render/Railway API
 
 ---
 
-### Backend — Node Host (RECOMMENDED)
+### Backend — Railway Node Host
 
-Render and Railway both offer a free tier that runs the existing `apps/api/src/server.ts` entry with zero Prisma changes. This is the recommended path for reliability.
+Current production API: `https://api.betterme.yesterhaze.codes`.
 
-#### Render (example)
+The Railway service uses the root `railway.json`:
 
-> **Requires your Render account.**
+- Build command: `pnpm install --frozen-lockfile && pnpm --filter @betterme/api exec prisma generate`
+- Pre-deploy command: `pnpm --filter @betterme/api exec prisma migrate deploy`
+- Start command: `pnpm --filter @betterme/api start`
+- Health check: `/api/health`
 
-1. Create a new **Web Service** in the Render dashboard.
-2. Connect your GitHub repository.
-3. Set:
-   - **Root directory:** `apps/api`
-   - **Build command:** `pnpm install && pnpm --filter @betterme/api exec prisma generate`
-   - **Start command:** `node --loader tsx src/server.ts`
-   - **Node version:** 20
-4. Add environment variables in Render's dashboard:
-   - `DATABASE_URL` — Supabase pooler URL (`?schema=public`)
-   - `DIRECT_URL` — Supabase direct URL
-   - `WEB_ORIGIN` — *(optional)* your Cloudflare Pages domain (e.g. `https://betterme.pages.dev`) to restrict CORS. Defaults to `*` (safe — auth uses `x-user-id` header, no cookies/credentials).
-5. Deploy. Note your public URL (e.g. `https://betterme-api.onrender.com`).
-6. Health check: `curl https://betterme-api.onrender.com/api/health`
+Required Railway variables:
+
+```bash
+DATABASE_URL=postgresql://...pooler.supabase.com:5432/postgres?schema=public&sslmode=require
+DIRECT_URL=postgresql://...pooler.supabase.com:5432/postgres?schema=public&sslmode=require
+WEB_ORIGIN=https://betterme-4j4.pages.dev,https://betterme.yesterhaze.codes
+NODE_ENV=production
+```
+
+Deploy from the repository root:
+
+```bash
+railway deployment up --service api --environment production
+```
+
+Health check:
+
+```bash
+curl https://api.betterme.yesterhaze.codes/api/health
+```
 
 ---
 
@@ -540,17 +580,17 @@ Workers deployment requires additional Prisma configuration (driver adapter). Se
    - **Framework preset:** None
    - **Build command:** `pnpm --filter @betterme/web build`
    - **Build output directory:** `apps/web/dist`
-4. Add environment variable: `VITE_API_BASE` = `https://your-backend-url` (set at **build time** — Vite bakes this into the bundle)
-5. *(Optional)* On the backend, set `WEB_ORIGIN` = your Pages domain to restrict CORS (e.g. `https://betterme.pages.dev`).
-6. Deploy.
+4. Add environment variable: `VITE_API_BASE=https://api.betterme.yesterhaze.codes` (set at **build time** — Vite bakes this into the bundle)
+5. Add the custom domain `betterme.yesterhaze.codes`.
+6. On the backend, keep `WEB_ORIGIN=https://betterme-4j4.pages.dev,https://betterme.yesterhaze.codes`.
+7. Deploy.
 
 **Option B — Wrangler CLI:**
 ```bash
 # After wrangler login
-pnpm --filter @betterme/web build
-npx wrangler pages project create betterme-web
-npx wrangler pages deploy apps/web/dist --project-name betterme-web \
-  --env VITE_API_BASE=https://your-backend-url
+VITE_API_BASE=https://api.betterme.yesterhaze.codes pnpm --filter @betterme/web build
+npx wrangler pages project create betterme --production-branch main
+npx wrangler pages deploy apps/web/dist --project-name betterme
 ```
 
 See `apps/web/wrangler.toml` for reference build settings.
@@ -566,18 +606,21 @@ See `apps/web/wrangler.toml` for reference build settings.
 | BMI formula, boundary BMI categories (18.5, 25, 30) | Unit | `shared/tests/health.spec.ts` | Core algorithm must be correct; boundaries are the most likely mistake |
 | Mifflin-St Jeor calories — male vs female, goal deficit/surplus | Unit | same | Algorithm branch coverage |
 | Target-date at 0.5 kg/week, delta=0 returns today | Unit | same | Regression guard for date arithmetic |
-| Zod schema ranges (height, age, enum, type coercion) | Unit | `shared/tests/schemas.spec.ts` | Schema is the API contract — invalid values must be rejected at the boundary |
+| Zod schema ranges and goal/target consistency | Unit | `shared/tests/schemas.spec.ts` | Schema is the API contract — invalid values and contradictory targets must be rejected at the boundary |
 | Create assessment → step save → progress recovery | Integration | `api/tests/integration/assessment-flow.spec.ts` | Core persistence loop |
 | Out-of-order PATCH (step 2 then step 1) | Integration | same | Real-world user behaviour: browser back button, duplicate requests |
+| Stale save after newer save does not regress `current_step` | Integration | same | Prevents slow network responses from moving a user backward |
 | Duplicate PATCH (same step twice) | Integration | same | Idempotency requirement |
 | Invalid field value → 400 | Integration | same | Error path coverage |
 | Cross-user access → 403 | Integration | same | Authorization must be tested, not just documented |
 | Non-existent assessment → 404 | Integration | same | Standard error paths |
 | Submit computes + persists correct BMI | Integration | `api/tests/integration/submit.spec.ts` | Verifies algorithm is actually called and result stored |
 | Submit with incomplete data → 400 | Integration | same | Guards against submitting before all fields are filled |
+| Submit with contradictory target weight → 400 | Integration | same | Guards against logically invalid health plans even if fields arrive in separate PATCH requests |
 | Non-member result: locked fields absent | Integration | `api/tests/integration/auth-diff.spec.ts` | Masking is a security requirement — absence must be asserted, not just presence of `locked:true` |
 | /pay unlocks → full result appears | Integration | same | End-to-end subscription state machine |
 | Repeated /pay is idempotent | Integration | same | Prevents duplicate demo activation from rewriting payment metadata |
+| /pay rejects assessment owner mismatch | Integration | same | Prevents one user from unlocking against another user's assessment |
 | Session localStorage round-trip | Component | `web/tests/session.spec.ts` | session.ts is used by every API call |
 | Funnel renders gender step, advances instantly, and saves in the background | Component | `web/tests/funnel.spec.tsx` | Guards the no-wait UX for the 4-step flow |
 | Result page: pending generation, local preview, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the slow-backend fallback and optimistic unlock UI flow |
@@ -591,6 +634,6 @@ See `apps/web/wrangler.toml` for reference build settings.
 |---|---|
 | Real payment processing | Out of scope — `/pay` is a mock callback. A real integration would require a payment provider sandbox and test cards. |
 | Real user authentication / login | The system uses anonymous sessions (UUID in localStorage). A real auth system (OAuth, JWT rotation) is explicitly out of scope per the challenge spec. |
-| Load / concurrency testing | No explicit concurrency test — Postgres transactions handle it; adding a load test would require a separate tool (k6, Artillery) and is beyond the 3-day challenge scope. |
+| Load testing | No k6/Artillery-style throughput test — beyond the 3-day challenge scope. The key stale-save race is covered by integration tests. |
 | Playwright tests in CI | E2E tests require two live servers and a seeded DB. CI runs unit + integration only; E2E is run manually or in a dedicated staging environment. |
 | Workers-path integration tests | The Cloudflare Workers deployment path (worker.ts + Prisma adapter) is intentionally not tested in the main suite to avoid coupling the test path to the adapter. |

@@ -49,6 +49,19 @@ describe('assessment persistence & recovery', () => {
     expect(body.current_step).toBe(2);
   });
 
+  it('does not regress current_step when a stale save arrives later', async () => {
+    const { userId, assessmentId } = await start();
+    const patch = (b: object) => app.request(`/api/assessments/${assessmentId}`, { method: 'PATCH', headers: h(userId), body: JSON.stringify(b) });
+    await patch({ gender: 'female', current_step: 3 });
+    await patch({ age: 30, current_step: 1 });
+
+    const res = await app.request(`/api/assessments/${assessmentId}`, { headers: h(userId) });
+    const body = await res.json();
+    expect(body.gender).toBe('female');
+    expect(body.age).toBe(30);
+    expect(body.current_step).toBe(3);
+  });
+
   it('rejects invalid values (400)', async () => {
     const { userId, assessmentId } = await start();
     const res = await app.request(`/api/assessments/${assessmentId}`, { method: 'PATCH', headers: h(userId), body: JSON.stringify({ height_cm: 10 }) });

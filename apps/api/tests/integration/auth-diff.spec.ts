@@ -70,4 +70,15 @@ describe('differentiated result & pay unlock', () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it('rejects paying with an assessment owned by another user (403)', async () => {
+    const caller = await completed();
+    const other = await completed();
+    const res = await app.request('/api/pay', {
+      method: 'POST',
+      headers: h(caller.userId),
+      body: JSON.stringify({ userId: caller.userId, assessmentId: other.assessmentId }),
+    });
+    expect(res.status).toBe(403);
+  });
 });

@@ -46,4 +46,16 @@ describe('submitSchema', () => {
       unknownField: 'x',
     }).success).toBe(false);
   });
+  it.each([
+    ['lose_weight', 70, 70],
+    ['lose_weight', 70, 75],
+    ['gain_muscle', 70, 70],
+    ['gain_muscle', 70, 65],
+  ] as const)('rejects unreasonable target weight for %s', (primary_goal, weight_kg, target_weight_kg) => {
+    const r = submitSchema.safeParse({
+      gender: 'female', primary_goal, age: 28,
+      height_cm: 165, weight_kg, target_weight_kg, workout_frequency: 'light',
+    });
+    expect(r.success).toBe(false);
+  });
 });

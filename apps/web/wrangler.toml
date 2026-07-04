@@ -8,7 +8,8 @@
 # Build settings (enter in Cloudflare Pages Dashboard or pass to wrangler):
 #   Build command:  pnpm --filter @betterme/web build
 #   Output dir:     apps/web/dist
-#   Production URL: https://betterme-4j4.pages.dev
+#   Production URL: https://betterme.yesterhaze.codes
+#   Pages fallback: https://betterme-4j4.pages.dev
 #
 # Environment variables (set in Dashboard → Settings → Environment variables):
 #   VITE_API_BASE   =  https://api.betterme.yesterhaze.codes
