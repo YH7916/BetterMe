@@ -52,6 +52,7 @@ export function ResultPage() {
 
   async function load({ preserveExisting = false }: { preserveExisting?: boolean } = {}) {
     let id: string | null = null;
+    let prepared = false;
     try {
       id = await resolveAssessmentId();
       if (!id) {
@@ -60,6 +61,8 @@ export function ResultPage() {
       }
 
       setLoadError(null);
+      await prepareResult(id);
+      prepared = true;
       const result = await api.getResult(id);
       setState(result);
       setGenerating(false);
@@ -69,7 +72,9 @@ export function ResultPage() {
         setGenerating(true);
         try {
           if (!id) return 'pending' as const;
-          await prepareResult(id);
+          if (!prepared) {
+            await prepareResult(id);
+          }
           const result = await api.getResult(id);
           sessionStorage.removeItem(GENERATION_ERROR_KEY);
           setState(result);

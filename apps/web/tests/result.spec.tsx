@@ -29,6 +29,20 @@ beforeEach(() => {
   const getResult = vi.spyOn(client.api, 'getResult');
   getResult.mockResolvedValueOnce(maskedResponse);
   getResult.mockResolvedValueOnce(fullResponse);
+  vi.spyOn(client.api, 'getProgress').mockResolvedValue({
+    assessmentId: 'a1',
+    userId: 'u1',
+    gender: 'female',
+    primary_goal: 'lose_weight',
+    age: 28,
+    height_cm: 165,
+    weight_kg: 70,
+    target_weight_kg: 60,
+    workout_frequency: 'light',
+    current_step: 4,
+    status: 'completed',
+  });
+  vi.spyOn(client.api, 'submit').mockResolvedValue({ status: 'completed' });
   vi.spyOn(client.api, 'pay').mockResolvedValue({ status: 'active' });
 });
 
@@ -56,6 +70,37 @@ describe('ResultPage', () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
     await waitFor(() => screen.getByText(/加载失败|result missing/i));
+  });
+
+  it('prepares incomplete assessments before fetching the result', async () => {
+    vi.mocked(client.api.getResult).mockReset();
+    vi.mocked(client.api.getResult).mockResolvedValueOnce(maskedResponse);
+    vi.spyOn(client.api, 'getProgress').mockResolvedValue({
+      assessmentId: 'a1',
+      userId: 'u1',
+      gender: 'female',
+      primary_goal: 'lose_weight',
+      age: 28,
+      height_cm: 165,
+      weight_kg: 70,
+      target_weight_kg: 60,
+      workout_frequency: 'light',
+      current_step: 4,
+      status: 'in_progress',
+    });
+    vi.spyOn(client.api, 'submit').mockResolvedValue({ status: 'completed' });
+
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
+
+    expect(await screen.findByRole('button', { name: /支付|解锁|pay/i })).toBeTruthy();
+    expect(client.api.getProgress).toHaveBeenCalledWith('a1');
+    expect(client.api.submit).toHaveBeenCalledWith('a1');
+    expect(vi.mocked(client.api.getProgress).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(client.api.getResult).mock.invocationCallOrder[0],
+    );
+    expect(vi.mocked(client.api.submit).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(client.api.getResult).mock.invocationCallOrder[0],
+    );
   });
 
   it('keeps users on a generating state while a completed assessment result is not ready yet', async () => {
