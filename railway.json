@@ -5,6 +5,7 @@
     "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter @betterme/api exec prisma generate"
   },
   "deploy": {
+    "preDeployCommand": "pnpm --filter @betterme/api exec prisma migrate deploy",
     "startCommand": "pnpm --filter @betterme/api start",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
