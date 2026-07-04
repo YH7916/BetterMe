@@ -16,4 +16,24 @@ describe('CORS', () => {
     expect([200, 204]).toContain(res.status);
     expect(res.headers.get('access-control-allow-methods')).toContain('PATCH');
   });
+
+  it('allows comma-separated production origins and rejects others', async () => {
+    const previousOrigin = process.env.WEB_ORIGIN;
+    try {
+      process.env.WEB_ORIGIN = 'https://betterme.pages.dev, https://betterme.yesterhaze.codes';
+      const app = createApp();
+
+      const allowed = await app.request('/api/health', { headers: { Origin: 'https://betterme.yesterhaze.codes' } });
+      expect(allowed.headers.get('access-control-allow-origin')).toBe('https://betterme.yesterhaze.codes');
+
+      const rejected = await app.request('/api/health', { headers: { Origin: 'https://evil.example' } });
+      expect(rejected.headers.get('access-control-allow-origin')).toBeNull();
+    } finally {
+      if (previousOrigin === undefined) {
+        delete process.env.WEB_ORIGIN;
+      } else {
+        process.env.WEB_ORIGIN = previousOrigin;
+      }
+    }
+  });
 });
