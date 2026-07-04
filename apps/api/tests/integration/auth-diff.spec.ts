@@ -45,6 +45,22 @@ describe('differentiated result & pay unlock', () => {
     expect(body.result.algorithm_version).toBeDefined();
   });
 
+  it('keeps repeated pay calls idempotent for the same user', async () => {
+    const { userId, assessmentId } = await completed();
+
+    const first = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify({ userId, assessmentId }) });
+    expect(first.status).toBe(200);
+    const firstSubscription = await prisma.subscription.findUniqueOrThrow({ where: { userId } });
+
+    const second = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify({ userId, assessmentId }) });
+    expect(second.status).toBe(200);
+    const secondSubscription = await prisma.subscription.findUniqueOrThrow({ where: { userId } });
+
+    expect(secondSubscription.status).toBe('active');
+    expect(secondSubscription.paymentRef).toBe(firstSubscription.paymentRef);
+    expect(secondSubscription.activatedAt?.getTime()).toBe(firstSubscription.activatedAt?.getTime());
+  });
+
   it('rejects paying for another user (403)', async () => {
     const { userId, assessmentId } = await completed();
     const res = await app.request('/api/pay', {

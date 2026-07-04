@@ -40,11 +40,14 @@ export function BodyStep({ onNext }: { onNext: (p: BodyData) => void }) {
     targetWeight.trim() !== '';
 
   return (
-    <div className="container">
-      <h2>你的身体数据 / Body Info</h2>
-      {error && <p role="alert" style={{ color: 'red' }}>{error}</p>}
+    <section className="container step-card">
+      <p className="eyebrow">Body</p>
+      <h1>你的身体数据</h1>
+      <p className="supporting-copy">这些数据只用于生成当前测评计划。</p>
+      {error && <p className="error-banner" role="alert">{error}</p>}
 
-      <div>
+      <div className="field-grid">
+      <div className="field">
         <label htmlFor="age">年龄 / Age</label>
         <input
           id="age"
@@ -57,7 +60,7 @@ export function BodyStep({ onNext }: { onNext: (p: BodyData) => void }) {
         />
       </div>
 
-      <div>
+      <div className="field">
         <label htmlFor="height">身高 / Height (cm)</label>
         <input
           id="height"
@@ -70,7 +73,7 @@ export function BodyStep({ onNext }: { onNext: (p: BodyData) => void }) {
         />
       </div>
 
-      <div>
+      <div className="field">
         <label htmlFor="weight">体重 / Weight (kg)</label>
         <input
           id="weight"
@@ -83,7 +86,7 @@ export function BodyStep({ onNext }: { onNext: (p: BodyData) => void }) {
         />
       </div>
 
-      <div>
+      <div className="field">
         <label htmlFor="target_weight">目标体重 / Target Weight (kg)</label>
         <input
           id="target_weight"
@@ -95,10 +98,11 @@ export function BodyStep({ onNext }: { onNext: (p: BodyData) => void }) {
           placeholder="kg"
         />
       </div>
+      </div>
 
-      <button disabled={!isValid} onClick={handleNext}>
+      <button className="primary-button" disabled={!isValid} onClick={handleNext}>
         下一步 / next
       </button>
-    </div>
+    </section>
   );
 }

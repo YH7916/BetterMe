@@ -61,7 +61,7 @@ erDiagram
 |---|---|---|
 | users → assessments | 1 : many | A user can start multiple assessments (abandoned sessions). Each assessment is independent. |
 | assessments → assessment_results | 1 : 0..1 | A result only exists after `POST /submit` succeeds. The `assessment_id` FK is `UNIQUE`, enforcing at most one result per assessment. |
-| users → subscriptions | 1 : 0..1 | Every user gets a `subscriptions` row on creation (status `inactive`). `POST /pay` updates it to `active`. `user_id` FK is `UNIQUE`. |
+| users → subscriptions | 1 : 0..1 | Every user gets a `subscriptions` row on creation (status `inactive`). The first `POST /pay` updates it to `active`; repeated calls are idempotent. `user_id` FK is `UNIQUE`. |
 
 ---
 
@@ -81,7 +81,7 @@ Stores computed outputs only — no raw user inputs. The `algorithm_version` fie
 
 ### subscriptions
 
-One row per user, created at user creation with `status = inactive`. This avoids a nullable join in the result query: `subscriptionRepo.findByUser()` always returns a row and the service just checks `status === 'active'`. Nullable fields (`plan`, `activated_at`, `payment_ref`) are set by `/pay` and can be extended for real payment provider data (e.g. Stripe `payment_intent_id`) without a migration.
+One row per user, created at user creation with `status = inactive`. This avoids a nullable join in the result query: `subscriptionRepo.findByUser()` always returns a row and the service just checks `status === 'active'`. Nullable fields (`plan`, `activated_at`, `payment_ref`) are set by the first `/pay` activation and kept stable on repeated demo unlock calls. They can be extended for real payment provider data (e.g. Stripe `payment_intent_id`) without a migration.
 
 ---
 

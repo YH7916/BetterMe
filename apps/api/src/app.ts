@@ -5,12 +5,9 @@ import { api } from './routes';
 import { env } from './config/env';
 import type { assessmentRepo } from './repositories/assessment.repository';
 
-// Typed context variables to satisfy TypeScript strict mode.
-// `assessment` holds the Awaited return type of assessmentRepo.findById (non-null),
-// set by the requireOwnership middleware after verifying ownership.
 export type AppVariables = {
   body: unknown;
-  assessment?: NonNullable<Awaited<ReturnType<typeof assessmentRepo.findById>>>;
+  assessment?: NonNullable<Awaited<ReturnType<typeof assessmentRepo.findOwnerById>>>;
 };
 
 export function createApp() {

@@ -15,20 +15,25 @@ export function FrequencyStep({
 }) {
   const [freq, setFreq] = useState<WorkoutFrequency>();
   return (
-    <div className="container">
-      <h2>运动频率 / Workout Frequency</h2>
+    <section className="container step-card">
+      <p className="eyebrow">Activity</p>
+      <h1>运动频率</h1>
+      <p className="supporting-copy">选择最接近你最近两周状态的一项。</p>
+      <div className="choice-grid">
       {FREQUENCIES.map((f) => (
         <button
           key={f.value}
+          className="choice-button"
           aria-pressed={freq === f.value}
           onClick={() => setFreq(f.value)}
         >
           {f.label}
         </button>
       ))}
-      <button disabled={!freq} onClick={() => onNext({ workout_frequency: freq! })}>
+      </div>
+      <button className="primary-button" disabled={!freq} onClick={() => onNext({ workout_frequency: freq! })}>
         下一步 / next / 完成
       </button>
-    </div>
+    </section>
   );
 }

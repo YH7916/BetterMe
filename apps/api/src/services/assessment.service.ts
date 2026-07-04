@@ -4,11 +4,13 @@ import { AppError } from '../lib/errors';
 import { userRepo } from '../repositories/user.repository';
 import { assessmentRepo } from '../repositories/assessment.repository';
 import { resultRepo } from '../repositories/result.repository';
+import { prisma } from '../lib/prisma';
 
 export const assessmentService = {
   async start() {
-    const user = await userRepo.create();
-    const a = await assessmentRepo.create(user.id);
+    const user = await userRepo.createWithAssessment();
+    const a = user.assessments[0];
+    if (!a) throw new Error('assessment creation failed');
     return { userId: user.id, assessmentId: a.id, currentStep: a.currentStep };
   },
   async getProgress(id: string) {
@@ -17,8 +19,7 @@ export const assessmentService = {
     return a;
   },
   async saveStep(id: string, data: StepUpdate) {
-    await assessmentRepo.patch(id, data);
-    return assessmentRepo.findById(id);
+    return assessmentRepo.patch(id, data);
   },
   async submit(id: string) {
     const a = await assessmentRepo.findById(id);
@@ -35,14 +36,17 @@ export const assessmentService = {
     if (!parsed.success) throw AppError.badRequest('assessment data incomplete', 'INCOMPLETE');
     const d = parsed.data;
     const bmi = calcBmi(d.weight_kg, d.height_cm);
-    await resultRepo.upsert(id, {
+    const result = {
       bmi,
       bmiCategory: bmiCategory(bmi),
       dailyCalorieIntake: calcDailyCalories({ gender: d.gender, age: d.age, heightCm: d.height_cm, weightKg: d.weight_kg, frequency: d.workout_frequency, goal: d.primary_goal }),
       targetDate: predictTargetDate(d.weight_kg, d.target_weight_kg, new Date()),
       algorithmVersion: ALGORITHM_VERSION,
+    };
+    await prisma.$transaction(async (tx) => {
+      await resultRepo.upsert(id, result, tx);
+      await assessmentRepo.markCompleted(id, tx);
     });
-    await assessmentRepo.markCompleted(id);
     return { status: 'completed' as const };
   },
 };

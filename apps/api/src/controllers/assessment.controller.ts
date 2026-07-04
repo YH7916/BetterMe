@@ -29,7 +29,7 @@ export const assessmentController = {
     return c.json(await assessmentService.start(), 201);
   },
   async get(c: AppContext) {
-    return c.json(toProgressDTO(c.get('assessment')!));
+    return c.json(toProgressDTO(await assessmentService.getProgress(c.req.param('id')!)));
   },
   async patch(c: AppContext) {
     const body = stepUpdateSchema.parse(c.get('body'));

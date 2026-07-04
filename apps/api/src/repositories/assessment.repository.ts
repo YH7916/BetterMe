@@ -1,5 +1,22 @@
 import { prisma } from '../lib/prisma';
+import type { Prisma } from '@prisma/client';
 import type { StepUpdate } from '@betterme/shared';
+
+type DbClient = Prisma.TransactionClient | typeof prisma;
+
+const progressSelect = {
+  id: true,
+  userId: true,
+  gender: true,
+  primaryGoal: true,
+  age: true,
+  heightCm: true,
+  weightKg: true,
+  targetWeightKg: true,
+  workoutFrequency: true,
+  currentStep: true,
+  status: true,
+};
 
 function mapPatch(data: StepUpdate) {
   const {
@@ -20,7 +37,8 @@ function mapPatch(data: StepUpdate) {
 
 export const assessmentRepo = {
   create: (userId: string) => prisma.assessment.create({ data: { userId } }),
-  findById: (id: string) => prisma.assessment.findUnique({ where: { id }, include: { result: true, user: { include: { subscription: true } } } }),
-  patch: (id: string, data: StepUpdate) => prisma.assessment.update({ where: { id }, data: mapPatch(data) }),
-  markCompleted: (id: string) => prisma.assessment.update({ where: { id }, data: { status: 'completed' } }),
+  findOwnerById: (id: string) => prisma.assessment.findUnique({ where: { id }, select: { id: true, userId: true } }),
+  findById: (id: string) => prisma.assessment.findUnique({ where: { id }, select: progressSelect }),
+  patch: (id: string, data: StepUpdate) => prisma.assessment.update({ where: { id }, data: mapPatch(data), select: progressSelect }),
+  markCompleted: (id: string, db: DbClient = prisma) => db.assessment.update({ where: { id }, data: { status: 'completed' } }),
 };

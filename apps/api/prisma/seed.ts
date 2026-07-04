@@ -42,4 +42,4 @@ async function main() {
   console.log('PAID_TEST_USER_ID=', paidUser.id);
   console.log('PAID_TEST_ASSESSMENT_ID=', paidUser.assessments[0].id);
 }
-main().finally(() => prisma.$disconnect());
+void main().finally(() => prisma.$disconnect());

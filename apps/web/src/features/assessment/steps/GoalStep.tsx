@@ -10,20 +10,25 @@ const GOALS: { value: Goal; label: string }[] = [
 export function GoalStep({ onNext }: { onNext: (p: { primary_goal: Goal }) => void }) {
   const [goal, setGoal] = useState<Goal>();
   return (
-    <div className="container">
-      <h2>你的目标 / Your Goal</h2>
+    <section className="container step-card">
+      <p className="eyebrow">Goal</p>
+      <h1>你的主要目标</h1>
+      <p className="supporting-copy">计划会根据目标调整热量范围和达成周期。</p>
+      <div className="choice-grid">
       {GOALS.map((g) => (
         <button
           key={g.value}
+          className="choice-button"
           aria-pressed={goal === g.value}
           onClick={() => setGoal(g.value)}
         >
           {g.label}
         </button>
       ))}
-      <button disabled={!goal} onClick={() => onNext({ primary_goal: goal! })}>
+      </div>
+      <button className="primary-button" disabled={!goal} onClick={() => onNext({ primary_goal: goal! })}>
         下一步 / next
       </button>
-    </div>
+    </section>
   );
 }

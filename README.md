@@ -160,6 +160,13 @@ The seed script prints the two demo credentials (also hardcoded below in §Prepa
 ### 4. Start development servers
 
 ```bash
+# One command from the repository root
+pnpm dev
+```
+
+Or run the two services separately:
+
+```bash
 # Terminal 1 — backend (http://localhost:8787)
 pnpm --filter @betterme/api dev
 
@@ -184,8 +191,27 @@ This runs (in parallel across packages):
 | Package | Runner | What runs |
 |---|---|---|
 | `packages/shared` | Vitest | 30 unit tests — algorithm boundaries (BMI, calories, target-date) + Zod schema validation |
-| `apps/api` | Vitest | 16 integration tests against the `test` Supabase schema |
-| `apps/web` | Vitest + RTL | 4 component tests (session, funnel, result page) |
+| `apps/api` | Vitest | 19 integration tests against the `test` Supabase schema |
+| `apps/web` | Vitest + RTL | 22 component tests (session, funnel, result page, optimistic unlock, restart) |
+
+For a demo-ready verification pass:
+
+```bash
+pnpm verify
+```
+
+This runs ESLint, typecheck, all Vitest suites, the production frontend build, and the Playwright funnel E2E.
+
+### Lint
+
+```bash
+pnpm lint
+pnpm lint:fix
+pnpm --filter @betterme/api lint
+pnpm --filter @betterme/web lint
+```
+
+ESLint uses a root flat config (`eslint.config.js`) across `apps/*` and `packages/*`, with TypeScript, React Hooks, React Refresh, floating Promise, unused variable, and type-import rules. Husky installs a `pre-commit` hook via `pnpm install`; commits run `pnpm lint` and `pnpm typecheck` before Git accepts them.
 
 ### E2E tests (Playwright)
 
@@ -196,17 +222,26 @@ pnpm --filter @betterme/web e2e
 Requires both dev servers running (or Playwright auto-starts them via `webServer` in `playwright.config.ts`).
 Covers the complete funnel → submit → masked result → pay → full result unlock flow.
 
+### Interview demo flow
+
+1. Start with `pnpm dev`.
+2. Open `http://localhost:5173`.
+3. Complete the 4-step assessment. The UI advances immediately while saves continue in the background.
+4. On `/result`, show the masked BMI result and the simulated membership unlock.
+5. Click **模拟解锁会员 / Demo unlock**. Full result appears immediately and then syncs with the backend.
+6. Click **重新开始 / Restart demo** to clear local demo session state and run the flow again.
+
 ### CI
 
 ![CI](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml/badge.svg)
 
-> CI runs typecheck + all Vitest tests against a `postgres:16` service container on every push and PR.
+> CI runs lint + typecheck + all Vitest tests against a `postgres:16` service container on every push, PR, manual dispatch, and a daily 02:00 UTC scheduled self-check.
 
 ---
 
 ## API Documentation
 
-All endpoints are prefixed with `/api`. Authentication uses the `x-user-id` header (a UUID returned by `POST /assessments` and stored in `localStorage`). No cookies, no JWT.
+All endpoints are prefixed with `/api`. Demo authentication uses the `x-user-id` header (a UUID returned by `POST /assessments` and stored in `localStorage`). No cookies, no JWT. This is intentionally simple for the challenge; production auth should replace it before a real launch.
 
 Unified error body: `{ "error": { "code": "string", "message": "string" } }`
 
@@ -345,6 +380,8 @@ The fields `daily_calorie_intake` and `target_date` are **never** sent to non-me
 
 Simulates a payment callback that activates the user's subscription. The `x-user-id` header **must equal** `body.userId` — a mismatch returns 403.
 
+The endpoint is idempotent for an already-active subscription: repeated calls return `active` without rewriting the original activation timestamp or payment reference.
+
 **Request body:**
 ```json
 {
@@ -409,6 +446,24 @@ curl -s -X POST "$API/api/assessments/$NEW/submit" -H "x-user-id: $NEW_UID"
 # GET result as non-member: locked === true, daily_calorie_intake is absent
 curl "$API/api/assessments/$NEW/result" -H "x-user-id: $NEW_UID"
 ```
+
+---
+
+## Launch Readiness
+
+Current status: suitable for an interviewer demo or private staging deployment. The core flow is covered by unit, integration, component, and browser E2E tests.
+
+Before a real public launch:
+
+| Area | Current demo implementation | Production requirement |
+|---|---|---|
+| Auth | Anonymous UUID in `localStorage` + `x-user-id` | Real auth provider, token validation, session expiry, user deletion/export path |
+| Payment | Mock `/api/pay` activation endpoint | Stripe/Creem/Paddle Checkout, signed webhook verification, idempotency keys, refund/cancel states |
+| Medical safety | BMI/calorie estimate + health disclaimer | Stronger disclaimers, contraindication screening, escalation copy for unsafe inputs |
+| Operations | Local logs + GitHub CI | Request logging, error tracking, uptime checks, DB backup/restore playbook |
+| Abuse/rate limits | Ownership checks + validation | API rate limiting and bot protection |
+
+For a polished but still demo-safe deployment, use Supabase + Render/Railway API + Cloudflare Pages frontend, then set `VITE_API_BASE` to the deployed API origin and optionally restrict `WEB_ORIGIN`.
 
 ---
 
@@ -522,9 +577,12 @@ See `apps/web/wrangler.toml` for reference build settings.
 | Submit with incomplete data → 400 | Integration | same | Guards against submitting before all fields are filled |
 | Non-member result: locked fields absent | Integration | `api/tests/integration/auth-diff.spec.ts` | Masking is a security requirement — absence must be asserted, not just presence of `locked:true` |
 | /pay unlocks → full result appears | Integration | same | End-to-end subscription state machine |
+| Repeated /pay is idempotent | Integration | same | Prevents duplicate demo activation from rewriting payment metadata |
 | Session localStorage round-trip | Component | `web/tests/session.spec.ts` | session.ts is used by every API call |
-| Funnel renders gender step, saves on Next | Component | `web/tests/funnel.spec.tsx` | Smoke test for the most critical user-facing path |
-| Result page: paywall visible, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the pay-to-unlock UI flow |
+| Funnel renders gender step, advances instantly, and saves in the background | Component | `web/tests/funnel.spec.tsx` | Guards the no-wait UX for the 4-step flow |
+| Result page: pending generation, local preview, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the slow-backend fallback and optimistic unlock UI flow |
+| Result restart clears local demo state | Component | same | Makes repeated interviewer demos deterministic |
+| Health disclaimer stays visible with results | Component | same | Keeps the medical boundary explicit |
 | Full funnel → masked → pay → unlock | E2E (Playwright) | `web/e2e/funnel.e2e.ts` | Only a real browser test proves the complete stack works together |
 
 ### What is intentionally NOT covered and why

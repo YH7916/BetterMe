@@ -18,7 +18,7 @@ Full reference for all six `/api` endpoints. For a quick summary table see the r
 
 All protected endpoints read the caller's identity from the `x-user-id` request header. This header must be a valid UUID returned by `POST /api/assessments` and stored by the frontend in `localStorage`.
 
-There is no JWT, no cookie, and no session server. The pattern is intentionally minimal: this is an anonymous quiz funnel, not a user account system.
+There is no JWT, no cookie, and no session server. The pattern is intentionally minimal for the challenge demo: this is an anonymous quiz funnel, not a production user account system.
 
 ---
 
@@ -238,6 +238,8 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 
 The `assessmentId` field is required by `paySchema` (Zod) for future extensibility (per-assessment subscriptions). Currently only `userId` is used to activate the subscription.
 
+The endpoint is idempotent for an already-active subscription: repeated calls return `{ "status": "active" }` without rewriting `payment_ref` or `activated_at`.
+
 **Response 200:**
 ```json
 { "status": "active" }
@@ -269,7 +271,7 @@ curl http://localhost:8787/api/assessments/ef0e9e76-0322-45af-89cc-f4b785c7b264/
   -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1"
 ```
 
-**Replay /pay (calling /pay when already active succeeds — re-sets the same active state — but it is a plain `update`, not an upsert):**
+**Replay /pay (calling /pay when already active succeeds and keeps the existing activation metadata unchanged):**
 ```bash
 curl -X POST http://localhost:8787/api/pay \
   -H "content-type: application/json" \

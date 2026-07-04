@@ -2,15 +2,30 @@
   "name": "betterme",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "prepare": "husky",
+    "dev": "pnpm --parallel --filter @betterme/api --filter @betterme/web dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "lint": "pnpm lint:root && pnpm -r lint",
+    "lint:fix": "pnpm lint:root:fix && pnpm -r lint:fix",
+    "lint:root": "eslint eslint.config.js --max-warnings=0",
+    "lint:root:fix": "eslint eslint.config.js --fix",
+    "typecheck": "pnpm -r typecheck",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm --filter @betterme/web build && pnpm --filter @betterme/web e2e"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
+    "husky": "^9.1.7",
     "typescript": "^5.6.0",
+    "typescript-eslint": "^8.62.1",
     "vitest": "^2.1.0"
   }
 }

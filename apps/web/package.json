@@ -6,6 +6,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "lint": "eslint src tests e2e vite.config.ts playwright.config.ts --max-warnings=0",
+    "lint:fix": "eslint src tests e2e vite.config.ts playwright.config.ts --fix",
     "test": "vitest run",
     "e2e": "playwright test",
     "typecheck": "tsc --noEmit"
