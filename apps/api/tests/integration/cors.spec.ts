@@ -20,7 +20,7 @@ describe('CORS', () => {
   it('allows comma-separated production origins and rejects others', async () => {
     const previousOrigin = process.env.WEB_ORIGIN;
     try {
-      process.env.WEB_ORIGIN = 'https://betterme.pages.dev, https://betterme.yesterhaze.codes';
+      process.env.WEB_ORIGIN = 'https://betterme-4j4.pages.dev, https://betterme.yesterhaze.codes';
       const app = createApp();
 
       const allowed = await app.request('/api/health', { headers: { Origin: 'https://betterme.yesterhaze.codes' } });

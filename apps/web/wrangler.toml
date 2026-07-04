@@ -8,20 +8,20 @@
 # Build settings (enter in Cloudflare Pages Dashboard or pass to wrangler):
 #   Build command:  pnpm --filter @betterme/web build
 #   Output dir:     apps/web/dist
+#   Production URL: https://betterme-4j4.pages.dev
 #
 # Environment variables (set in Dashboard → Settings → Environment variables):
-#   VITE_API_BASE   =  https://betterme-api.<your-subdomain>.workers.dev
-#                      (or your Render/Railway backend URL if using Node host)
+#   VITE_API_BASE   =  https://api.betterme.yesterhaze.codes
 #
 # Deploy commands (after `wrangler login`):
 #   # First deploy (creates project):
 #   pnpm --filter @betterme/web build
-#   npx wrangler pages project create betterme-web
-#   npx wrangler pages deploy apps/web/dist --project-name betterme-web
+#   npx wrangler pages project create betterme --production-branch main
+#   npx wrangler pages deploy apps/web/dist --project-name betterme
 #
 #   # Subsequent deploys:
 #   pnpm --filter @betterme/web build
-#   npx wrangler pages deploy apps/web/dist --project-name betterme-web
+#   npx wrangler pages deploy apps/web/dist --project-name betterme
 # ─────────────────────────────────────────────────────────────────────────────
 
 [build]
