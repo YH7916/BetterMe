@@ -54,6 +54,23 @@ async function checkFrontend() {
   const html = await response.text();
   expect(response.status === 200, `frontend returned ${response.status}`);
   expect(html.includes('<div id="root">'), 'frontend HTML does not include the React root');
+
+  const scriptUrls = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"/g)].map((match) => {
+    const src = match[1];
+    return src.startsWith('http') ? src : new URL(src, FRONTEND_URL).toString();
+  });
+
+  if (scriptUrls.length > 0) {
+    const scripts = await Promise.all(scriptUrls.map(async (url) => {
+      const script = await fetchWithTimeout(url);
+      expect(script.status === 200, `frontend script ${url} returned ${script.status}`);
+      return script.text();
+    }));
+    const bundle = scripts.join('\n');
+    expect(bundle.includes('你平时喜欢普拉提吗'), 'frontend bundle does not include the new 5-stage funnel copy');
+    expect(bundle.includes('完整报告付费确认'), 'frontend bundle does not include the dedicated pay page');
+    expect(!bundle.includes('模拟解锁会员'), 'frontend bundle still includes the old direct unlock flow');
+  }
 }
 
 async function checkReadiness() {
@@ -80,10 +97,13 @@ async function checkAssessmentFlow() {
       age: 28,
       height_cm: 165,
       weight_kg: 70,
-      target_weight_kg: 60,
+      target_weight_kg: 75,
       workout_frequency: 'light',
-      current_step: 4,
+      current_step: 13,
     }),
+  }).then((patched) => {
+    expect(patched.current_step >= 13, 'current_step did not persist the longer funnel index');
+    expect(Number(patched.target_weight_kg) === 75, 'target weight above current weight was not persisted');
   });
 
   const submit = await fetchJson(`/api/assessments/${created.assessmentId}/submit`, {

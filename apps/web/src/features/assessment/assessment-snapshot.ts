@@ -3,7 +3,7 @@ import type { StepData } from '../../store/funnel';
 import type { ResultResponse } from '../result/types';
 
 const ASSESSMENT_SNAPSHOT_KEY = 'bm_assessment_snapshot';
-const LOCKED_MESSAGE = '升级会员查看每日建议摄入与目标达成日期';
+const LOCKED_MESSAGE = '解锁完整报告查看每日建议摄入与目标达成日期';
 
 export function saveAssessmentSnapshot(data: StepData) {
   sessionStorage.setItem(ASSESSMENT_SNAPSHOT_KEY, JSON.stringify(data));

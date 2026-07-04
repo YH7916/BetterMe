@@ -26,6 +26,9 @@ describe('stepUpdateSchema', () => {
   ])('rejects out-of-range %s = %d', (field, value) => {
     expect(stepUpdateSchema.safeParse({ [field]: value }).success).toBe(false);
   });
+  it('accepts current_step values from the longer questionnaire flow', () => {
+    expect(stepUpdateSchema.safeParse({ current_step: 13 }).success).toBe(true);
+  });
 });
 
 describe('submitSchema', () => {
@@ -47,15 +50,14 @@ describe('submitSchema', () => {
     }).success).toBe(false);
   });
   it.each([
-    ['lose_weight', 70, 70],
     ['lose_weight', 70, 75],
-    ['gain_muscle', 70, 70],
     ['gain_muscle', 70, 65],
-  ] as const)('rejects unreasonable target weight for %s', (primary_goal, weight_kg, target_weight_kg) => {
+    ['maintain', 70, 70],
+  ] as const)('allows target weight in either direction for %s', (primary_goal, weight_kg, target_weight_kg) => {
     const r = submitSchema.safeParse({
       gender: 'female', primary_goal, age: 28,
       height_cm: 165, weight_kg, target_weight_kg, workout_frequency: 'light',
     });
-    expect(r.success).toBe(false);
+    expect(r.success).toBe(true);
   });
 });

@@ -63,7 +63,7 @@ export function useFunnel() {
         if (existing) {
           const p = await api.getProgress(existing);
           const { assessmentId: _aid, userId: _uid, current_step, status: _st, ...stepFields } = p;
-          if (_st === 'completed' || current_step >= 4) {
+          if (_st === 'completed') {
             nav('/result');
             return;
           }
@@ -89,7 +89,7 @@ export function useFunnel() {
     })();
   }, [nav]);
 
-  async function next(patch: StepData) {
+  async function next(patch: StepData = {}, options: { complete?: boolean } = {}) {
     const merged = { ...data, ...patch };
     setData(merged);
     saveAssessmentSnapshot(merged);
@@ -97,7 +97,7 @@ export function useFunnel() {
 
     setSaveError(null);
 
-    if (nextStep >= 4) {
+    if (options.complete) {
       setStep(nextStep);
       nav('/result');
       void (async () => {

@@ -8,7 +8,7 @@ import { clearPendingAssessmentSession } from '../src/features/assessment/assess
 
 const maskedResponse: ResultResponse = {
   member: false,
-  result: { bmi: 25.7, bmi_category: 'overweight', locked: true, message: '升级会员查看每日建议摄入与目标达成日期' },
+  result: { bmi: 25.7, bmi_category: 'overweight', locked: true, message: '解锁完整报告查看每日建议摄入与目标达成日期' },
 };
 
 const fullResponse: ResultResponse = {
@@ -92,7 +92,7 @@ describe('ResultPage', () => {
 
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
-    expect(await screen.findByRole('button', { name: /支付|解锁|pay/i })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: /支付|解锁|pay/i })).toBeTruthy();
     expect(client.api.getProgress).toHaveBeenCalledWith('a1');
     expect(client.api.submit).toHaveBeenCalledWith('a1');
     expect(vi.mocked(client.api.getProgress).mock.invocationCallOrder[0]).toBeLessThan(
@@ -104,6 +104,15 @@ describe('ResultPage', () => {
   });
 
   it('waits for the final background save before fetching the result', async () => {
+    sessionStorage.setItem('bm_assessment_snapshot', JSON.stringify({
+      gender: 'female',
+      primary_goal: 'lose_weight',
+      age: 28,
+      height_cm: 165,
+      weight_kg: 70,
+      target_weight_kg: 60,
+      workout_frequency: 'light',
+    }));
     vi.mocked(client.api.getResult).mockReset();
     vi.mocked(client.api.getResult).mockResolvedValueOnce(maskedResponse);
     vi.spyOn(client.api, 'getProgress').mockResolvedValue({
@@ -115,15 +124,39 @@ describe('ResultPage', () => {
       height_cm: 165,
       weight_kg: 70,
       target_weight_kg: 60,
-      workout_frequency: 'light',
-      current_step: 3,
+      workout_frequency: null,
+      current_step: 12,
       status: 'in_progress',
     });
 
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
     await waitFor(() => expect(client.api.getProgress).toHaveBeenCalledWith('a1'));
-    expect(screen.getByText(/正在生成结果|generating/i)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /支付|解锁|pay/i })).toBeTruthy();
+    expect(client.api.submit).not.toHaveBeenCalled();
+    expect(client.api.getResult).not.toHaveBeenCalled();
+  });
+
+  it('prompts users to finish the assessment when required answers are missing', async () => {
+    vi.mocked(client.api.getResult).mockReset();
+    vi.spyOn(client.api, 'getProgress').mockResolvedValue({
+      assessmentId: 'a1',
+      userId: 'u1',
+      gender: 'female',
+      primary_goal: 'lose_weight',
+      age: 28,
+      height_cm: 165,
+      weight_kg: 70,
+      target_weight_kg: 60,
+      workout_frequency: null,
+      current_step: 12,
+      status: 'in_progress',
+    });
+
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
+
+    expect(await screen.findByText(/请先完成测评/i)).toBeTruthy();
+    expect(client.api.submit).not.toHaveBeenCalled();
     expect(client.api.getResult).not.toHaveBeenCalled();
   });
 
@@ -155,7 +188,7 @@ describe('ResultPage', () => {
     expect(await screen.findByText(/正在生成结果|generating/i)).toBeTruthy();
     await waitFor(() => expect(client.api.submit).toHaveBeenCalledWith('a1'));
     resolveResult!(maskedResponse);
-    expect(await screen.findByRole('button', { name: /支付|解锁|pay/i })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: /支付|解锁|pay/i })).toBeTruthy();
   });
 
   it('shows a local masked preview immediately while the backend result is still generating', async () => {
@@ -175,87 +208,37 @@ describe('ResultPage', () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
     expect(screen.getByText(/BMI/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /支付|解锁|pay/i })).toBeTruthy();
+    expect(screen.getByRole('link', { name: /支付|解锁|pay/i })).toBeTruthy();
   });
 
-  it('shows a local full preview immediately after pay while the backend result is still generating', async () => {
-    sessionStorage.setItem('bm_assessment_snapshot', JSON.stringify({
-      gender: 'female',
-      primary_goal: 'lose_weight',
-      age: 28,
-      height_cm: 165,
-      weight_kg: 70,
-      target_weight_kg: 60,
-      workout_frequency: 'light',
-    }));
+  it('opens the dedicated pay page from the result call to action without charging directly', async () => {
+    render(
+      <MemoryRouter initialEntries={['/result']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/result" element={<ResultPage />} />
+          <Route path="/pay" element={<div>Pay page route</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('link', { name: /支付|解锁|pay/i }));
+
+    expect(await screen.findByText(/Pay page route/i)).toBeTruthy();
+    expect(client.api.pay).not.toHaveBeenCalled();
+  });
+
+  it('renders full result without a paywall when the backend says the user is a member', async () => {
     vi.mocked(client.api.getResult).mockReset();
-    vi.mocked(client.api.getResult).mockRejectedValue(new Error('result not ready'));
-    vi.spyOn(client.api, 'getProgress').mockReturnValue(new Promise(() => undefined));
+    vi.mocked(client.api.getResult).mockResolvedValueOnce(fullResponse);
 
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
-    fireEvent.click(screen.getByRole('button', { name: /支付|解锁|pay/i }));
-
-    expect(await screen.findByText(/kcal/i)).toBeTruthy();
-    expect(screen.queryByText(/解锁你的完整计划/i)).toBeNull();
-  });
-
-  it('optimistically shows the full preview while the pay request is still pending', async () => {
-    sessionStorage.setItem('bm_assessment_snapshot', JSON.stringify({
-      gender: 'female',
-      primary_goal: 'lose_weight',
-      age: 28,
-      height_cm: 165,
-      weight_kg: 70,
-      target_weight_kg: 60,
-      workout_frequency: 'light',
-    }));
-    vi.mocked(client.api.getResult).mockReset();
-    vi.mocked(client.api.getResult).mockRejectedValue(new Error('result not ready'));
-    vi.spyOn(client.api, 'getProgress').mockReturnValue(new Promise(() => undefined));
-    vi.mocked(client.api.pay).mockReturnValue(new Promise(() => undefined));
-
-    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
-
-    fireEvent.click(screen.getByRole('button', { name: /支付|解锁|pay/i }));
-
-    expect(await screen.findByText(/kcal/i)).toBeTruthy();
-    expect(screen.queryByText(/解锁你的完整计划/i)).toBeNull();
-  });
-
-  it('keeps the current result visible when paid result refresh fails', async () => {
-    vi.mocked(client.api.getResult).mockReset();
-    vi.mocked(client.api.getResult)
-      .mockResolvedValueOnce(maskedResponse)
-      .mockRejectedValueOnce(new Error('sync failed'));
-
-    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
-
-    await waitFor(() => screen.getByRole('button', { name: /支付|解锁|pay/i }));
-    fireEvent.click(screen.getByRole('button', { name: /支付|解锁|pay/i }));
-
-    await waitFor(() => screen.getByText(/sync failed|同步失败|刷新失败/i));
-    expect(screen.getByText(/BMI/i)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /支付|解锁|pay/i })).toBeTruthy();
-  });
-
-  it('shows paywall then full result after pay', async () => {
-    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
-
-    // Paywall button is present and not disabled
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /支付|解锁|pay/i })).not.toBeDisabled();
-    });
-
-    // Protected value NOT rendered in masked state
-    expect(screen.queryByText(/1680/)).toBeNull();
-
-    // Click pay button
-    fireEvent.click(screen.getByRole('button', { name: /支付|解锁|pay/i }));
-
-    // After pay, full result shows calorie and label
-    await waitFor(() => screen.getByText(/1680/));
-    expect(screen.getByText(/每日建议摄入|daily/i)).toBeTruthy();
+    expect(await screen.findByText(/1680/)).toBeTruthy();
+    expect(screen.getByText('每日建议摄入')).toBeTruthy();
+    expect(screen.getByText(/会员已解锁/i)).toBeTruthy();
+    expect(screen.getByText(/28 天行动路径/i)).toBeTruthy();
+    expect(screen.getByText(/每日执行重点/i)).toBeTruthy();
+    expect(screen.queryByRole('link', { name: /支付|解锁|pay/i })).toBeNull();
   });
 
   it('clears the demo session and returns to the first screen when restarting', async () => {
@@ -278,7 +261,7 @@ describe('ResultPage', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => screen.getByRole('button', { name: /支付|解锁|pay/i }));
+    await waitFor(() => screen.getByRole('link', { name: /支付|解锁|pay/i }));
     fireEvent.click(screen.getByRole('button', { name: /重新开始|restart/i }));
 
     expect(localStorage.getItem('bm_user_id')).toBeNull();
@@ -287,10 +270,10 @@ describe('ResultPage', () => {
     expect(await screen.findByText(/Start page/i)).toBeTruthy();
   });
 
-  it('labels the membership action as a simulated demo unlock', async () => {
+  it('labels the paid action as the complete report unlock', async () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
-    expect(await screen.findByRole('button', { name: /模拟解锁|demo unlock/i })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: /解锁完整报告与行动方案/i })).toBeTruthy();
   });
 
   it('shows a health disclaimer with the result', async () => {

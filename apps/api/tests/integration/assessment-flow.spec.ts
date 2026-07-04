@@ -62,6 +62,28 @@ describe('assessment persistence & recovery', () => {
     expect(body.current_step).toBe(3);
   });
 
+  it('merges concurrent updates without regressing current_step', async () => {
+    const { userId, assessmentId } = await start();
+    const patch = (b: object) => app.request(`/api/assessments/${assessmentId}`, { method: 'PATCH', headers: h(userId), body: JSON.stringify(b) });
+
+    await Promise.all([
+      patch({ gender: 'female', current_step: 4 }),
+      patch({ age: 30, current_step: 13 }),
+      patch({ height_cm: 165, workout_frequency: 'light', current_step: 8 }),
+      patch({ weight_kg: 70, target_weight_kg: 75, current_step: 11 }),
+    ]);
+
+    const res = await app.request(`/api/assessments/${assessmentId}`, { headers: h(userId) });
+    const body = await res.json();
+    expect(body.gender).toBe('female');
+    expect(body.age).toBe(30);
+    expect(body.height_cm).toBe(165);
+    expect(body.weight_kg).toBe(70);
+    expect(body.target_weight_kg).toBe(75);
+    expect(body.workout_frequency).toBe('light');
+    expect(body.current_step).toBe(13);
+  });
+
   it('rejects invalid values (400)', async () => {
     const { userId, assessmentId } = await start();
     const res = await app.request(`/api/assessments/${assessmentId}`, { method: 'PATCH', headers: h(userId), body: JSON.stringify({ height_cm: 10 }) });

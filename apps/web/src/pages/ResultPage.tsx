@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api-client';
-import { clearSession, getUserId, getAssessmentId } from '../lib/session';
+import { clearSession, getAssessmentId } from '../lib/session';
 import { ResultView } from '../features/result/ResultView';
 import { Paywall } from '../features/paywall/Paywall';
 import type { ResultResponse } from '../features/result/types';
+import type { ProgressResponse } from '@betterme/shared';
 import { clearPendingAssessmentSession, getPendingAssessmentSession } from '../features/assessment/assessment-session';
 import { clearAssessmentSnapshot, getFullResultPreview, getMaskedResultPreview } from '../features/assessment/assessment-snapshot';
+import { clearPaymentUnlocked, hasPaymentUnlocked } from '../features/payment/payment-session';
 
 const RESULT_POLL_MS = 1000;
 const GENERATION_ERROR_KEY = 'bm_result_generation_error';
+const INCOMPLETE_ASSESSMENT_MESSAGE = '请先完成测评。';
 
 function messageOf(err: unknown) {
   return err instanceof Error ? err.message : '请求失败，请重试。';
@@ -19,14 +22,27 @@ function isResultPending(err: unknown) {
   return /result not ready|assessment data incomplete/i.test(messageOf(err));
 }
 
+function hasCompleteAssessmentInputs(progress: ProgressResponse) {
+  return Boolean(
+    progress.gender &&
+    progress.primary_goal &&
+    progress.workout_frequency &&
+    typeof progress.age === 'number' &&
+    typeof progress.height_cm === 'number' &&
+    typeof progress.weight_kg === 'number' &&
+    typeof progress.target_weight_kg === 'number',
+  );
+}
+
 export function ResultPage() {
   const navigate = useNavigate();
   const [state, setState] = useState<ResultResponse | null>(() => (
-    getAssessmentId() || getPendingAssessmentSession() ? getMaskedResultPreview() : null
+    getAssessmentId() || getPendingAssessmentSession()
+      ? (hasPaymentUnlocked() ? getFullResultPreview() ?? getMaskedResultPreview() : getMaskedResultPreview())
+      : null
   ));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
-  const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
 
   async function resolveAssessmentId() {
@@ -48,8 +64,9 @@ export function ResultPage() {
     if (progress.status === 'completed') {
       return true;
     }
-    if (progress.current_step < 4) {
-      return false;
+    if (!hasCompleteAssessmentInputs(progress)) {
+      if (getFullResultPreview()) return false;
+      throw new Error(INCOMPLETE_ASSESSMENT_MESSAGE);
     }
     await api.submit(assessmentId);
     return true;
@@ -132,44 +149,11 @@ export function ResultPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function pay() {
-    const previousState = state;
-    const optimisticFullPreview = getFullResultPreview();
-    setPaying(true);
-    setPayError(null);
-    if (optimisticFullPreview) setState(optimisticFullPreview);
-    try {
-      const id = await resolveAssessmentId();
-      const userId = getUserId();
-      if (!id || !userId) throw new Error('支付信息还未准备好，请重试。');
-      await api.pay(userId, id);
-      const fullPreview = getFullResultPreview();
-      if (fullPreview) {
-        setState(fullPreview);
-        setPaying(false);
-        void load({ preserveExisting: true }).then((status) => {
-          if (status === 'pending') {
-            setPayError('会员已开通，完整结果正在同步，请稍后重试。');
-          }
-        });
-        return;
-      }
-      const status = await load({ preserveExisting: true });
-      if (status === 'pending') {
-        setPayError('会员已开通，完整结果正在同步，请稍后重试。');
-      }
-    } catch (err) {
-      if (optimisticFullPreview) setState(previousState);
-      setPayError(messageOf(err));
-    } finally {
-      setPaying(false);
-    }
-  }
-
   function restartDemo() {
     clearSession();
     clearAssessmentSnapshot();
     clearPendingAssessmentSession();
+    clearPaymentUnlocked();
     sessionStorage.removeItem(GENERATION_ERROR_KEY);
     navigate('/');
   }
@@ -201,7 +185,7 @@ export function ResultPage() {
   return (
     <main className="app-shell">
       <ResultView data={state} />
-      {!state.member && <Paywall onPay={() => void pay()} loading={paying} />}
+      {!state.member && <Paywall />}
       {payError && <p className="container error-banner" role="alert">{payError}</p>}
       <div className="container result-actions">
         <button className="secondary-button" type="button" onClick={restartDemo}>

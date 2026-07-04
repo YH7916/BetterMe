@@ -169,12 +169,9 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 | `weight_kg` | number | 20–500 |
 | `target_weight_kg` | number | 20–500 |
 | `workout_frequency` | `"sedentary" \| "light" \| "moderate" \| "active"` | Enum |
-| `current_step` | integer | 0–10 |
+| `current_step` | integer | 0–2147483647 (database int storage bound, not a questionnaire-step cap) |
 
-When `primary_goal`, `weight_kg`, and `target_weight_kg` are present in the same payload, `stepUpdateSchema` also checks goal/target consistency:
-
-- `lose_weight`: `target_weight_kg` must be below `weight_kg`
-- `gain_muscle`: `target_weight_kg` must be above `weight_kg`
+`target_weight_kg` may be above, below, or equal to `weight_kg`. The API validates the number range only; the frontend/result copy is responsible for interpreting whether the user is aiming to lose weight, gain weight, maintain, or reshape.
 
 **Response 200:** updated progress object (same shape as GET /api/assessments/:id).
 
@@ -211,14 +208,14 @@ POST /api/assessments/ef0e9e76-0322-45af-89cc-f4b785c7b264/submit HTTP/1.1
 x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 ```
 
-No body required — data comes from the stored assessment. `submitSchema` re-validates all required fields plus goal/target consistency, so logically contradictory data is rejected even if it arrived across multiple PATCH requests.
+No body required — data comes from the stored assessment. `submitSchema` re-validates all required fields and numeric ranges before computing the result.
 
 **Response 200:**
 ```json
 { "status": "completed" }
 ```
 
-**Errors:** `400 INCOMPLETE` (missing required fields or contradictory target weight in stored assessment), `403`, `404`
+**Errors:** `400 INCOMPLETE` (missing required fields or invalid numeric values in stored assessment), `403`, `404`
 
 ---
 

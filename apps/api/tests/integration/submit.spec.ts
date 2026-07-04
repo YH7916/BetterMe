@@ -53,7 +53,7 @@ describe('submit', () => {
     const res = await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
     expect(res.status).toBe(400);
   });
-  it('rejects submit when target weight contradicts the selected goal (400)', async () => {
+  it('allows submit when target weight is above the current weight', async () => {
     const { userId, assessmentId } = await (await app.request('/api/assessments', { method: 'POST' })).json();
     await app.request(`/api/assessments/${assessmentId}`, {
       method: 'PATCH', headers: h(userId),
@@ -65,6 +65,6 @@ describe('submit', () => {
     });
 
     const res = await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
   });
 });

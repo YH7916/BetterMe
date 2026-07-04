@@ -36,7 +36,7 @@ PAID_TEST_ASSESSMENT_ID=ef0e9e76-0322-45af-89cc-f4b785c7b264
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Cloudflare Pages                                                   │
 │  apps/web  (Vite + React + React Router)                            │
-│  – 4-step funnel, auto-save, progress recovery, result + paywall    │
+│  – 5-stage funnel, auto-save, progress recovery, result + checkout  │
 └───────────────────────────────┬─────────────────────────────────────┘
                                 │  /api/*  (Vite dev proxy / VITE_API_BASE)
 ┌───────────────────────────────▼─────────────────────────────────────┐
@@ -212,9 +212,9 @@ This runs (in parallel across packages):
 
 | Package | Runner | What runs |
 |---|---|---|
-| `packages/shared` | Vitest | 34 unit tests — algorithm boundaries (BMI, calories, target-date) + Zod schema validation including target-weight direction |
-| `apps/api` | Vitest | 23 integration tests against the `test` schema |
-| `apps/web` | Vitest + RTL | 24 component tests (session, funnel, result page, optimistic unlock, restart) |
+| `packages/shared` | Vitest | 34 unit tests — algorithm boundaries (BMI, calories, target-date) + Zod schema validation including target-weight range and direction flexibility |
+| `apps/api` | Vitest | 26 integration tests against the `test` schema |
+| `apps/web` | Vitest + RTL | 32 component tests (session, 5-stage funnel, result page, checkout, optimistic unlock, restart) |
 
 For a demo-ready verification pass:
 
@@ -243,22 +243,23 @@ pnpm --filter @betterme/web e2e
 
 Requires both dev servers running (or Playwright auto-starts them via `webServer` in `playwright.config.ts`).
 Covers the complete funnel → submit → masked result → pay → full result unlock flow.
+To run the same browser flow against production, set `PLAYWRIGHT_BASE_URL=https://betterme.yesterhaze.codes`.
 
 ### Online interview demo flow
 
 1. Open `https://betterme.yesterhaze.codes`.
-2. Complete the 4-step assessment. The UI advances immediately while saves continue in the background.
-3. On `/result`, show the masked BMI result and the simulated membership unlock.
-4. Click **模拟解锁会员 / Demo unlock**. Full result appears immediately and syncs with the backend.
+2. Complete the 5-stage assessment. Choice questions advance immediately; basic body data is collected one field at a time.
+3. On `/result`, show the masked BMI preview and the full-report call to action.
+4. Click **解锁完整报告与行动方案**, confirm the simulated payment on `/pay`, then return to the full member report.
 5. Click **重新开始 / Restart demo** to clear local demo session state and run the flow again.
 
 ### Local interview demo flow
 
 1. Start with `pnpm dev`.
 2. Open `http://localhost:5173`.
-3. Complete the 4-step assessment. The UI advances immediately while saves continue in the background.
-4. On `/result`, show the masked BMI result and the simulated membership unlock.
-5. Click **模拟解锁会员 / Demo unlock**. Full result appears immediately and then syncs with the backend.
+3. Complete the 5-stage assessment. Choice questions advance immediately; basic body data is collected one field at a time.
+4. On `/result`, show the masked BMI preview and the full-report call to action.
+5. Click **解锁完整报告与行动方案**, confirm the simulated payment on `/pay`, then return to the full member report.
 6. Click **重新开始 / Restart demo** to clear local demo session state and run the flow again.
 
 ### CI
@@ -365,9 +366,9 @@ Saves one or more fields incrementally. All fields are optional (partial update)
 }
 ```
 
-**Validation ranges:** age 13–120, height_cm 50–260, weight_kg 20–500, target_weight_kg 20–500, current_step 0–10.
+**Validation ranges:** age 13–120, height_cm 50–260, weight_kg 20–500, target_weight_kg 20–500, current_step 0–2147483647.
 
-**Goal/target consistency:** for `lose_weight`, `target_weight_kg` must be below `weight_kg`; for `gain_muscle`, `target_weight_kg` must be above `weight_kg`. The final submit path re-validates this against the stored assessment data.
+**Goal/target direction:** `target_weight_kg` may be above, below, or equal to `weight_kg`. The API validates the numeric range only; the frontend/result copy interprets whether the user is aiming to lose weight, gain weight, maintain, or reshape.
 
 **Response 200:** updated progress object (same shape as GET).
 
@@ -386,7 +387,7 @@ Triggers server-side health algorithm using the stored assessment fields. All fi
 { "status": "completed" }
 ```
 
-**Errors:** `400 INCOMPLETE` (missing required fields or contradictory target weight), `403 FORBIDDEN`, `404 NOT_FOUND`
+**Errors:** `400 INCOMPLETE` (missing required fields or invalid numeric values), `403 FORBIDDEN`, `404 NOT_FOUND`
 
 ---
 
@@ -492,7 +493,7 @@ NEW_UID=$(echo "$NEW_RESP" | jq -r '.userId')
 # fill funnel steps + submit
 curl -s -X PATCH "$API/api/assessments/$NEW" \
   -H "content-type: application/json" -H "x-user-id: $NEW_UID" \
-  -d '{"gender":"female","primary_goal":"lose_weight","age":28,"height_cm":165,"weight_kg":70,"target_weight_kg":60,"workout_frequency":"light","current_step":4}'
+  -d '{"gender":"female","primary_goal":"lose_weight","age":28,"height_cm":165,"weight_kg":70,"target_weight_kg":75,"workout_frequency":"light","current_step":13}'
 curl -s -X POST "$API/api/assessments/$NEW/submit" -H "x-user-id: $NEW_UID"
 # GET result as non-member: locked === true, daily_calorie_intake is absent
 curl "$API/api/assessments/$NEW/result" -H "x-user-id: $NEW_UID"
@@ -629,23 +630,24 @@ See `apps/web/wrangler.toml` for reference build settings.
 | BMI formula, boundary BMI categories (18.5, 25, 30) | Unit | `shared/tests/health.spec.ts` | Core algorithm must be correct; boundaries are the most likely mistake |
 | Mifflin-St Jeor calories — male vs female, goal deficit/surplus | Unit | same | Algorithm branch coverage |
 | Target-date at 0.5 kg/week, delta=0 returns today | Unit | same | Regression guard for date arithmetic |
-| Zod schema ranges and goal/target consistency | Unit | `shared/tests/schemas.spec.ts` | Schema is the API contract — invalid values and contradictory targets must be rejected at the boundary |
+| Zod schema ranges and target-weight direction flexibility | Unit | `shared/tests/schemas.spec.ts` | Schema is the API contract — invalid ranges are rejected while lose/gain/maintain targets can move in either direction |
 | Create assessment → step save → progress recovery | Integration | `api/tests/integration/assessment-flow.spec.ts` | Core persistence loop |
 | Out-of-order PATCH (step 2 then step 1) | Integration | same | Real-world user behaviour: browser back button, duplicate requests |
 | Stale save after newer save does not regress `current_step` | Integration | same | Prevents slow network responses from moving a user backward |
+| Concurrent PATCH requests merge fields and keep the highest `current_step` | Integration | same | Proves the persistence layer handles overlapping saves instead of only sequential requests |
 | Duplicate PATCH (same step twice) | Integration | same | Idempotency requirement |
 | Invalid field value → 400 | Integration | same | Error path coverage |
 | Cross-user access → 403 | Integration | same | Authorization must be tested, not just documented |
 | Non-existent assessment → 404 | Integration | same | Standard error paths |
 | Submit computes + persists correct BMI | Integration | `api/tests/integration/submit.spec.ts` | Verifies algorithm is actually called and result stored |
 | Submit with incomplete data → 400 | Integration | same | Guards against submitting before all fields are filled |
-| Submit with contradictory target weight → 400 | Integration | same | Guards against logically invalid health plans even if fields arrive in separate PATCH requests |
+| Submit accepts target weight above current weight | Integration | same | Guards the supported gain/reshape path and prevents old direction-lock regressions |
 | Non-member result: locked fields absent | Integration | `api/tests/integration/auth-diff.spec.ts` | Masking is a security requirement — absence must be asserted, not just presence of `locked:true` |
 | /pay unlocks → full result appears | Integration | same | End-to-end subscription state machine |
 | Repeated /pay is idempotent | Integration | same | Prevents duplicate demo activation from rewriting payment metadata |
 | /pay rejects assessment owner mismatch | Integration | same | Prevents one user from unlocking against another user's assessment |
 | Session localStorage round-trip | Component | `web/tests/session.spec.ts` | session.ts is used by every API call |
-| Funnel renders gender step, advances instantly, and saves in the background | Component | `web/tests/funnel.spec.tsx` | Guards the no-wait UX for the 4-step flow |
+| Funnel starts with Pilates interest, auto-advances choices, and asks body data one field at a time | Component | `web/tests/funnel.spec.tsx` | Guards the low-pressure UX for the 5-stage flow |
 | Result page: pending generation, local preview, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the slow-backend fallback and optimistic unlock UI flow |
 | Result restart clears local demo state | Component | same | Makes repeated interviewer demos deterministic |
 | Health disclaimer stays visible with results | Component | same | Keeps the medical boundary explicit |
