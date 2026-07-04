@@ -106,7 +106,7 @@ betterme/
 
 ### Prerequisites
 
-- Node.js >= 20 (`node -v`)
+- Node.js >= 22 (`node -v`)
 - pnpm >= 9 (`npm i -g pnpm`)
 - A Supabase project with Postgres (free tier is fine)
 
