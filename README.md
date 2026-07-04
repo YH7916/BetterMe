@@ -16,8 +16,10 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 | Frontend fallback | https://betterme-4j4.pages.dev |
 | Backend API | https://api.betterme.yesterhaze.codes |
 | Health check | https://api.betterme.yesterhaze.codes/api/health |
+| Readiness check | https://api.betterme.yesterhaze.codes/api/ready |
 | GitHub repository | https://github.com/YH7916/BetterMe |
 | CI | https://github.com/YH7916/BetterMe/actions/workflows/ci.yml |
+| Production monitor | https://github.com/YH7916/BetterMe/actions/workflows/monitor.yml |
 
 Production paid demo credentials:
 
@@ -265,6 +267,23 @@ Covers the complete funnel → submit → masked result → pay → full result 
 
 > CI runs lint + typecheck + all Vitest tests against a `postgres:16` service container on every push, PR, manual dispatch, and a daily 02:00 UTC scheduled self-check.
 
+### Production monitoring
+
+The production monitor workflow (`.github/workflows/monitor.yml`) runs every 30 minutes and can also be triggered manually from GitHub Actions.
+
+```bash
+pnpm smoke:prod
+```
+
+The smoke monitor checks:
+
+- frontend HTML loads from `https://betterme.yesterhaze.codes`
+- `/api/health` returns a live API process
+- `/api/ready` confirms the API can query Supabase Postgres
+- full anonymous funnel path: create assessment -> save -> submit -> masked result
+- mock unlock path: `/api/pay` -> full member result
+- seeded paid demo session still returns member-only fields
+
 ---
 
 ## API Documentation
@@ -277,6 +296,8 @@ Unified error body: `{ "error": { "code": "string", "message": "string" } }`
 
 | # | Method | Path | Auth | Description |
 |---|---|---|---|---|
+| 0 | GET | `/api/health` | None | Liveness check: API process responds |
+| 0 | GET | `/api/ready` | None | Readiness check: API can query Postgres |
 | 1 | POST | `/api/assessments` | None | Create anonymous user + assessment |
 | 2 | GET | `/api/assessments/:id` | x-user-id (ownership) | Recover progress |
 | 3 | PATCH | `/api/assessments/:id` | x-user-id (ownership) | Incremental step save |
@@ -528,6 +549,7 @@ The Railway service uses the root `railway.json`:
 - Pre-deploy command: `pnpm --filter @betterme/api exec prisma migrate deploy`
 - Start command: `pnpm --filter @betterme/api start`
 - Health check: `/api/health`
+- Readiness check: `/api/ready`
 
 Required Railway variables:
 
@@ -544,10 +566,11 @@ Deploy from the repository root:
 railway deployment up --service api --environment production
 ```
 
-Health check:
+Health and readiness checks:
 
 ```bash
 curl https://api.betterme.yesterhaze.codes/api/health
+curl https://api.betterme.yesterhaze.codes/api/ready
 ```
 
 ---

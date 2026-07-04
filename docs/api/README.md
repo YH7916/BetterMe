@@ -1,6 +1,6 @@
 # API Reference — BetterMe 健康测评
 
-Full reference for all six `/api` endpoints. For a quick summary table see the root [README.md](../../README.md#api-documentation).
+Full reference for BetterMe's `/api` endpoints. For a quick summary table see the root [README.md](../../README.md#api-documentation).
 
 ---
 
@@ -10,6 +10,46 @@ Full reference for all six `/api` endpoints. For a quick summary table see the r
 |---|---|
 | Local dev | `http://localhost:8787` |
 | Production (Railway Node host) | `https://api.betterme.yesterhaze.codes` |
+
+---
+
+## Operational Health
+
+### GET /api/health
+
+Liveness check. Returns 200 when the API process can accept requests.
+
+```json
+{ "status": "ok" }
+```
+
+### GET /api/ready
+
+Readiness check. Returns 200 only when the API can query Postgres.
+
+**Response 200:**
+```json
+{
+  "status": "ok",
+  "checks": {
+    "database": "ok"
+  },
+  "latency_ms": 23
+}
+```
+
+**Response 503:**
+```json
+{
+  "status": "error",
+  "checks": {
+    "database": "error"
+  },
+  "latency_ms": 10001
+}
+```
+
+The scheduled production monitor uses `/api/ready` before running the full funnel smoke test.
 
 ---
 
@@ -37,6 +77,7 @@ There is no JWT, no cookie, and no session server. The pattern is intentionally 
 | 400 | Body fails Zod validation (`code: VALIDATION_ERROR`) or assessment data is incomplete for submit (`code: INCOMPLETE`) |
 | 403 | `x-user-id` header does not match the resource owner (`code: FORBIDDEN`) |
 | 404 | Resource does not exist (`code: NOT_FOUND`) |
+| 503 | Readiness check failed |
 | 500 | Unexpected server error (`code: INTERNAL`) |
 
 ---

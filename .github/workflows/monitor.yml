@@ -1,0 +1,26 @@
+name: Production Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Twice hourly, offset from the top of the hour to avoid common CI congestion.
+    - cron: "17,47 * * * *"
+
+concurrency:
+  group: production-monitor
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Run production smoke monitor
+        run: node scripts/production-smoke.js
+        env:
+          SMOKE_API_BASE: https://api.betterme.yesterhaze.codes
+          SMOKE_FRONTEND_URL: https://betterme.yesterhaze.codes

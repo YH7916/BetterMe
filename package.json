@@ -11,10 +11,11 @@
     "dev": "pnpm --parallel --filter @betterme/api --filter @betterme/web dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "smoke:prod": "node scripts/production-smoke.js",
     "lint": "pnpm lint:root && pnpm -r lint",
     "lint:fix": "pnpm lint:root:fix && pnpm -r lint:fix",
-    "lint:root": "eslint eslint.config.js --max-warnings=0",
-    "lint:root:fix": "eslint eslint.config.js --fix",
+    "lint:root": "eslint eslint.config.js scripts --max-warnings=0",
+    "lint:root:fix": "eslint eslint.config.js scripts --fix",
     "typecheck": "pnpm -r typecheck",
     "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm --filter @betterme/web build && pnpm --filter @betterme/web e2e"
   },
