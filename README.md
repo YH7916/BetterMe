@@ -214,7 +214,7 @@ This runs (in parallel across packages):
 |---|---|---|
 | `packages/shared` | Vitest | 34 unit tests — algorithm boundaries (BMI, calories, target-date) + Zod schema validation including target-weight range and direction flexibility |
 | `apps/api` | Vitest | 26 integration tests against the `test` schema |
-| `apps/web` | Vitest + RTL | 32 component tests (session, 5-stage funnel, result page, checkout, optimistic unlock, restart) |
+| `apps/web` | Vitest + RTL | 33 component tests (session, 5-stage funnel, result page, checkout, optimistic unlock, restart) |
 
 For a demo-ready verification pass:
 

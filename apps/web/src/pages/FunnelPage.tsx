@@ -301,6 +301,7 @@ export function FunnelPage() {
               />
             ) : (
               <NumberQuestionView
+                key={activeQuestion.field}
                 question={activeQuestion}
                 data={data}
                 onNext={(patch) => void next(patch)}

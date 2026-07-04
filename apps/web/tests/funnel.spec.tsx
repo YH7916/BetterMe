@@ -108,6 +108,30 @@ describe('FunnelPage', () => {
     expect(screen.queryByRole('heading', { name: /再补充几个基础数据/i })).toBeNull();
   });
 
+  it('clears each numeric input when moving to the next body question', async () => {
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><FunnelPage /></MemoryRouter>);
+
+    await choose(/有兴趣，还没开始/i);
+    await screen.findByRole('heading', { name: /你更希望通过普拉提改善什么/i });
+    await choose(/瘦下来/i);
+    await screen.findByRole('heading', { name: /你觉得自己现在的身材/i });
+    await choose(/腰腹容易囤肉/i);
+    await screen.findByRole('heading', { name: /你最想先改善哪个部位/i });
+    await choose(/^01\s*小腹/i);
+    await screen.findByRole('heading', { name: /你期待自己的身材/i });
+    await choose(/^02\s*腰腹紧致/i);
+    await screen.findByRole('heading', { name: /你希望多久看到变化/i });
+    await choose(/28 天形成明显改善/i);
+    await screen.findByRole('heading', { name: /你的性别是/i });
+    await choose(/女性/i);
+
+    fireEvent.change(await screen.findByLabelText(/年龄/i), { target: { value: '28' } });
+    fireEvent.click(screen.getByRole('button', { name: /继续/i }));
+
+    const heightInput = await screen.findByLabelText(/身高/i) as HTMLInputElement;
+    expect(heightInput.value).toBe('');
+  });
+
   it('shows a friendly validation message for out-of-range age', async () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><FunnelPage /></MemoryRouter>);
 
