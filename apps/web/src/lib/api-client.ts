@@ -1,7 +1,7 @@
 import type { StepUpdate } from '@betterme/shared';
 import type { ProgressResponse } from '@betterme/shared';
 import type { ResultResponse } from '../features/result/types';
-import { getToken } from './session';
+import { getToken, clearSession } from './session';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
@@ -11,7 +11,12 @@ async function req<T = unknown>(path: string, init: RequestInit = {}): Promise<T
     ...init,
     headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers },
   });
-  if (!res.ok) throw new Error(((await res.json()) as { error?: { message?: string } }).error?.message ?? 'request failed');
+  if (!res.ok) {
+    // A rejected/absent token can never recover — drop it so the next load
+    // starts a fresh session instead of looping on 401.
+    if (res.status === 401) clearSession();
+    throw new Error(((await res.json()) as { error?: { message?: string } }).error?.message ?? 'request failed');
+  }
   return res.json() as Promise<T>;
 }
 

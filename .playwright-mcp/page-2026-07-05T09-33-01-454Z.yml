@@ -1,0 +1,36 @@
+- main [ref=f2e3]:
+  - generic [ref=f2e4]:
+    - generic [ref=f2e5]:
+      - generic [ref=f2e6]: 身体状态测评
+      - generic [ref=f2e7]: 1 / 5 · 兴趣切入
+    - generic "测评进度" [ref=f2e8]:
+      - progressbar [ref=f2e9]
+    - generic [ref=f2e11]:
+      - paragraph [ref=f2e12]: Pilates
+      - heading "你平时喜欢普拉提吗？" [level=1] [ref=f2e13]
+      - paragraph [ref=f2e14]: 先从一个很轻的问题开始。选择最接近你现在状态的一项就好。
+      - generic [ref=f2e15]:
+        - button "01 喜欢，想坚持下去 已经感受到它对体态和线条的帮助。" [ref=f2e16] [cursor=pointer]:
+          - generic [ref=f2e17]: "01"
+          - generic [ref=f2e18]:
+            - strong [ref=f2e19]: 喜欢，想坚持下去
+            - generic [ref=f2e20]: 已经感受到它对体态和线条的帮助。
+          - generic [ref=f2e21]: ✓
+        - button "02 有兴趣，还没开始 想先看看它是否适合自己。" [ref=f2e22] [cursor=pointer]:
+          - generic [ref=f2e23]: "02"
+          - generic [ref=f2e24]:
+            - strong [ref=f2e25]: 有兴趣，还没开始
+            - generic [ref=f2e26]: 想先看看它是否适合自己。
+          - generic [ref=f2e27]: ✓
+        - button "03 试过，但没坚持住 希望这次能有更清晰的路径。" [ref=f2e28] [cursor=pointer]:
+          - generic [ref=f2e29]: "03"
+          - generic [ref=f2e30]:
+            - strong [ref=f2e31]: 试过，但没坚持住
+            - generic [ref=f2e32]: 希望这次能有更清晰的路径。
+          - generic [ref=f2e33]: ✓
+        - button "04 想看看适不适合 还在了解阶段，不想给自己太大压力。" [ref=f2e34] [cursor=pointer]:
+          - generic [ref=f2e35]: "04"
+          - generic [ref=f2e36]:
+            - strong [ref=f2e37]: 想看看适不适合
+            - generic [ref=f2e38]: 还在了解阶段，不想给自己太大压力。
+          - generic [ref=f2e39]: ✓
