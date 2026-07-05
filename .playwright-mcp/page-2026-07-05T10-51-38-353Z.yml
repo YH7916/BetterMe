@@ -1,0 +1,29 @@
+- main [ref=f1e296]:
+  - generic [ref=f1e297]:
+    - generic [ref=f1e298]:
+      - paragraph [ref=f1e299]: Secure checkout
+      - heading "完整报告付费确认" [level=1] [ref=f1e300]
+      - paragraph [ref=f1e301]: 你的身体状态预览已经生成。解锁后会看到更具体的每日建议、目标时间和 28 天行动路径。
+    - generic [ref=f1e302]:
+      - generic [ref=f1e303]:
+        - generic [ref=f1e304]:
+          - generic [ref=f1e305]:
+            - paragraph [ref=f1e306]: BetterMe AI Coach
+            - heading "完整报告与行动方案" [level=2] [ref=f1e307]
+          - generic [ref=f1e308]:
+            - generic [ref=f1e309]: ¥
+            - strong [ref=f1e310]: "19"
+        - list [ref=f1e311]:
+          - listitem [ref=f1e312]: ✓每日建议摄入与目标达成时间
+          - listitem [ref=f1e313]: ✓基于 BMI、目标和运动频率的行动建议
+          - listitem [ref=f1e314]: ✓适合低压力起步的 28 天训练路径
+        - generic [ref=f1e315]:
+          - generic [ref=f1e316]: 当前预览 BMI
+          - strong [ref=f1e317]: "25.7"
+        - button "确认支付，立即解锁" [ref=f1e318] [cursor=pointer]
+        - link "返回结果预览" [ref=f1e319] [cursor=pointer]:
+          - /url: /result
+      - complementary [ref=f1e320]:
+        - heading "本次为模拟支付" [level=3] [ref=f1e321]
+        - paragraph [ref=f1e322]: 点击确认后会调用文档要求的 /pay 回调，把当前用户会员状态设为有效。
+        - paragraph [ref=f1e323]: 完成后结果页会从脱敏预览切换为完整数据。

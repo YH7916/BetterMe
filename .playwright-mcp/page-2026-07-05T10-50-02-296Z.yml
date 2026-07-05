@@ -1,0 +1,36 @@
+- main [ref=f1e3]:
+  - generic [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e6]: 身体状态测评
+      - generic [ref=f1e7]: 5 / 5 · 生活节奏
+    - generic "测评进度" [ref=f1e8]:
+      - progressbar [ref=f1e9]
+    - generic [ref=f1e11]:
+      - paragraph [ref=f1e12]: Rhythm
+      - heading "你现在每周运动几次？" [level=1] [ref=f1e220]
+      - paragraph [ref=f1e14]: 选择最近两周最接近的状态，不需要假装很自律。
+      - generic [ref=f1e221]:
+        - button "01 几乎不运动 想先从很低压力的动作开始。" [ref=f1e222] [cursor=pointer]:
+          - generic [ref=f1e223]: "01"
+          - generic [ref=f1e224]:
+            - strong [ref=f1e225]: 几乎不运动
+            - generic [ref=f1e226]: 想先从很低压力的动作开始。
+          - generic [ref=f1e227]: ✓
+        - button "02 1-2 次 偶尔会运动，但还不稳定。" [ref=f1e228] [cursor=pointer]:
+          - generic [ref=f1e229]: "02"
+          - generic [ref=f1e230]:
+            - strong [ref=f1e231]: 1-2 次
+            - generic [ref=f1e232]: 偶尔会运动，但还不稳定。
+          - generic [ref=f1e233]: ✓
+        - button "03 3-4 次 已经有一定习惯，想提高效果。" [ref=f1e234] [cursor=pointer]:
+          - generic [ref=f1e235]: "03"
+          - generic [ref=f1e236]:
+            - strong [ref=f1e237]: 3-4 次
+            - generic [ref=f1e238]: 已经有一定习惯，想提高效果。
+          - generic [ref=f1e239]: ✓
+        - button "04 5 次以上 运动频率较高，希望更系统。" [ref=f1e240] [cursor=pointer]:
+          - generic [ref=f1e241]: "04"
+          - generic [ref=f1e242]:
+            - strong [ref=f1e243]: 5 次以上
+            - generic [ref=f1e244]: 运动频率较高，希望更系统。
+          - generic [ref=f1e245]: ✓

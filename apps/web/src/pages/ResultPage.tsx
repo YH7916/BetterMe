@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api-client';
 import { clearSession, getAssessmentId } from '../lib/session';
@@ -10,7 +10,9 @@ import { clearPendingAssessmentSession, getPendingAssessmentSession } from '../f
 import { clearAssessmentSnapshot, getMaskedResultPreview } from '../features/assessment/assessment-snapshot';
 
 const RESULT_POLL_MS = 1000;
+const MAX_GENERATING_POLLS = 15;
 const GENERATION_ERROR_KEY = 'bm_result_generation_error';
+const COMPLETING_KEY = 'bm_completing';
 const INCOMPLETE_ASSESSMENT_MESSAGE = '请先完成测评。';
 
 function messageOf(err: unknown) {
@@ -45,6 +47,7 @@ export function ResultPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const generatingPolls = useRef(0);
 
   async function resolveAssessmentId() {
     const existing = getAssessmentId();
@@ -90,10 +93,26 @@ export function ResultPage() {
         return 'pending' as const;
       }
       const result = await api.getResult(id);
+      generatingPolls.current = 0;
+      sessionStorage.removeItem(COMPLETING_KEY);
       setState(result);
       setGenerating(false);
       return 'loaded' as const;
     } catch (err) {
+      const message = messageOf(err);
+      // Completion race: the funnel sets `bm_completing` while it flushes the
+      // final save + submit in the background. Until that finishes, an
+      // "incomplete" reading is expected — keep polling instead of hard-failing.
+      // Without the flag, incomplete inputs mean the user really hasn't finished.
+      if (
+        message === INCOMPLETE_ASSESSMENT_MESSAGE &&
+        sessionStorage.getItem(COMPLETING_KEY) &&
+        generatingPolls.current < MAX_GENERATING_POLLS
+      ) {
+        generatingPolls.current += 1;
+        setGenerating(true);
+        return 'pending' as const;
+      }
       if (isResultPending(err)) {
         setGenerating(true);
         try {
@@ -103,23 +122,24 @@ export function ResultPage() {
           }
           const result = await api.getResult(id);
           sessionStorage.removeItem(GENERATION_ERROR_KEY);
+          sessionStorage.removeItem(COMPLETING_KEY);
+          generatingPolls.current = 0;
           setState(result);
           setGenerating(false);
           return 'loaded' as const;
         } catch (pendingErr) {
           if (isResultPending(pendingErr)) return 'pending' as const;
-          const message = messageOf(pendingErr);
+          const pendingMessage = messageOf(pendingErr);
           if (preserveExisting || state) {
-            setPayError(`刷新失败：${message}`);
+            setPayError(`刷新失败：${pendingMessage}`);
             return 'failed' as const;
           }
           setGenerating(false);
-          setLoadError(message);
+          setLoadError(pendingMessage);
           return 'failed' as const;
         }
       }
 
-      const message = messageOf(err);
       if (preserveExisting || state) {
         setPayError(`刷新失败：${message}`);
         return 'failed' as const;
@@ -154,6 +174,7 @@ export function ResultPage() {
     clearAssessmentSnapshot();
     clearPendingAssessmentSession();
     sessionStorage.removeItem(GENERATION_ERROR_KEY);
+    sessionStorage.removeItem(COMPLETING_KEY);
     navigate('/');
   }
 

@@ -1,0 +1,18 @@
+- main [ref=f1e277]:
+  - generic [ref=f1e278]:
+    - paragraph [ref=f1e279]: Preview
+    - heading "你的身体状态预览" [level=1] [ref=f1e280]
+    - paragraph [ref=f1e281]: 你已经完成基础诊断。完整方案会继续给出每日建议、目标时间和行动路径。
+    - generic [ref=f1e283]:
+      - generic [ref=f1e284]: BMI
+      - strong [ref=f1e285]: "25.7"
+      - generic [ref=f1e286]: overweight
+    - paragraph [ref=f1e287]: 该结果仅供健康管理参考，不能替代医生或营养师的专业建议。
+  - generic [ref=f1e288]:
+    - generic [ref=f1e289]:
+      - paragraph [ref=f1e290]: Complete plan
+      - heading "你的完整报告与行动方案已生成" [level=2] [ref=f1e291]
+      - paragraph [ref=f1e292]: 解锁后查看每日建议摄入、目标达成时间和 28 天行动路径。
+    - link "解锁完整报告与行动方案" [ref=f1e293] [cursor=pointer]:
+      - /url: /pay
+  - button "重新开始 / Restart demo" [ref=f1e295] [cursor=pointer]

@@ -1,0 +1,16 @@
+- main [ref=f1e3]:
+  - generic [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e6]: 身体状态测评
+      - generic [ref=f1e7]: 4 / 5 · 基础数据
+    - generic "测评进度" [ref=f1e8]:
+      - progressbar [ref=f1e9]
+    - generic [ref=f1e11]:
+      - paragraph [ref=f1e12]: Target
+      - heading "你的目标体重是多少？" [level=1] [ref=f1e214]
+      - paragraph [ref=f1e14]: 可以比现在更低、更高或接近现在，按你期待的状态填写就好。
+      - generic [ref=f1e215]:
+        - generic [ref=f1e216]:
+          - generic [ref=f1e217]: 目标体重 kg
+          - spinbutton "目标体重 kg" [active] [ref=f1e218]
+        - button "继续" [disabled] [ref=f1e219]

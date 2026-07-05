@@ -1,0 +1,36 @@
+- main [ref=f1e3]:
+  - generic [ref=f1e4]:
+    - generic [ref=f1e5]:
+      - generic [ref=f1e6]: 身体状态测评
+      - generic [ref=f1e7]: 3 / 5 · 期望结果
+    - generic "测评进度" [ref=f1e8]:
+      - progressbar [ref=f1e9]
+    - generic [ref=f1e11]:
+      - paragraph [ref=f1e12]: Pace
+      - heading "你希望多久看到变化？" [level=1] [ref=f1e158]
+      - paragraph [ref=f1e14]: 节奏不用激进。能持续，才更容易真的改变。
+      - generic [ref=f1e15]:
+        - button "01 7 天先有感觉 希望先建立一点正反馈。" [ref=f1e159] [cursor=pointer]:
+          - generic [ref=f1e160]: "01"
+          - generic [ref=f1e161]:
+            - strong [ref=f1e162]: 7 天先有感觉
+            - generic [ref=f1e163]: 希望先建立一点正反馈。
+          - generic [ref=f1e164]: ✓
+        - button "02 14 天看到一点变化 想要短期内看到方向。" [ref=f1e165] [cursor=pointer]:
+          - generic [ref=f1e166]: "02"
+          - generic [ref=f1e167]:
+            - strong [ref=f1e168]: 14 天看到一点变化
+            - generic [ref=f1e169]: 想要短期内看到方向。
+          - generic [ref=f1e170]: ✓
+        - button "03 28 天形成明显改善 愿意给自己一个完整周期。" [ref=f1e171] [cursor=pointer]:
+          - generic [ref=f1e172]: "03"
+          - generic [ref=f1e173]:
+            - strong [ref=f1e174]: 28 天形成明显改善
+            - generic [ref=f1e175]: 愿意给自己一个完整周期。
+          - generic [ref=f1e176]: ✓
+        - button "04 慢慢来，能坚持最重要 优先选择稳定和不反弹。" [ref=f1e177] [cursor=pointer]:
+          - generic [ref=f1e178]: "04"
+          - generic [ref=f1e179]:
+            - strong [ref=f1e180]: 慢慢来，能坚持最重要
+            - generic [ref=f1e181]: 优先选择稳定和不反弹。
+          - generic [ref=f1e182]: ✓

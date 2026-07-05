@@ -99,17 +99,22 @@ export function useFunnel() {
 
     if (options.complete) {
       setStep(nextStep);
+      sessionStorage.setItem('bm_completing', '1'); // result page polls while this is set
       nav('/result');
       void (async () => {
         await enqueueSave(merged, nextStep);
         const assessmentId = await ensureSession();
         await api.submit(assessmentId);
-      })().catch((err) => {
-        sessionStorage.setItem(
-          'bm_result_generation_error',
-          err instanceof Error ? err.message : '结果生成失败，请重试。',
-        );
-      });
+      })()
+        .catch((err) => {
+          sessionStorage.setItem(
+            'bm_result_generation_error',
+            err instanceof Error ? err.message : '结果生成失败，请重试。',
+          );
+        })
+        .finally(() => {
+          sessionStorage.removeItem('bm_completing');
+        });
     } else {
       setStep(nextStep);
       void enqueueSave(merged, nextStep).catch((err) => {
