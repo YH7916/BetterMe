@@ -1,9 +1,32 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { PayPage } from '../src/pages/PayPage';
 import * as client from '../src/lib/api-client';
 import { clearPendingAssessmentSession } from '../src/features/assessment/assessment-session';
+
+const paymentResponse = {
+  status: 'active',
+  payment: {
+    id: 'p1',
+    provider: 'mock',
+    provider_ref: 'mock_ref',
+    status: 'succeeded',
+    amount_cents: 1900,
+    currency: 'CNY',
+  },
+};
+
+const fullResponse = {
+  member: true,
+  result: {
+    bmi: 25.7,
+    bmi_category: 'overweight',
+    daily_calorie_intake: 1680,
+    target_date: '2026-06-01',
+    algorithm_version: 'v1',
+  },
+} as const;
 
 beforeEach(() => {
   localStorage.setItem('bm_user_id', 'u1');
@@ -18,7 +41,8 @@ beforeEach(() => {
     target_weight_kg: 60,
     workout_frequency: 'light',
   }));
-  vi.spyOn(client.api, 'pay').mockResolvedValue({ status: 'active' });
+  vi.spyOn(client.api, 'pay').mockResolvedValue(paymentResponse);
+  vi.spyOn(client.api, 'getResult').mockResolvedValue(fullResponse);
 });
 
 afterEach(() => {
@@ -52,6 +76,28 @@ describe('PayPage', () => {
 
     await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('u1', 'a1'));
     expect(await screen.findByText(/Unlocked result route/i)).toBeTruthy();
+  });
+
+  it('fetches the backend-confirmed full result before returning from checkout', async () => {
+    function ResultRouteProbe() {
+      const location = useLocation();
+      return <div>{location.state?.result?.result?.daily_calorie_intake ?? 'no result state'}</div>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/pay']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <Routes>
+          <Route path="/pay" element={<PayPage />} />
+          <Route path="/result" element={<ResultRouteProbe />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /确认支付|立即解锁/i }));
+
+    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('u1', 'a1'));
+    await waitFor(() => expect(client.api.getResult).toHaveBeenCalledWith('a1'));
+    expect(await screen.findByText('1680')).toBeTruthy();
   });
 
   it('shows a recoverable payment error when the callback fails', async () => {

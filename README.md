@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml/badge.svg)](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml)
 
-A full-stack health assessment quiz funnel inspired by the BetterMe challenge. Users step through a guided form, the backend persists progress for recovery, computes a personalised health plan server-side, and returns differentiated results based on subscription status (free users see a masked teaser; members get the full plan). A mock `/pay` endpoint simulates a payment callback that unlocks the full result.
+A full-stack health assessment quiz funnel inspired by the BetterMe challenge. Users step through a guided form, the backend persists progress for recovery, computes a personalised health plan server-side, and returns differentiated results based on subscription status (free users see a masked teaser; members get the full plan). A mock `/pay` endpoint simulates a production-style checkout callback with payment records, idempotency, and subscription activation.
 
 Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-design.md`](docs/superpowers/specs/2026-07-02-health-assessment-backend-design.md)
 
@@ -14,7 +14,8 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 |---|---|
 | Frontend demo | https://betterme.yesterhaze.codes |
 | Frontend fallback | https://betterme-4j4.pages.dev |
-| Backend API | https://api.betterme.yesterhaze.codes |
+| API dashboard | https://api.betterme.yesterhaze.codes |
+| Backend API base | https://api.betterme.yesterhaze.codes/api |
 | Health check | https://api.betterme.yesterhaze.codes/api/health |
 | Readiness check | https://api.betterme.yesterhaze.codes/api/ready |
 | GitHub repository | https://github.com/YH7916/BetterMe |
@@ -430,24 +431,37 @@ The fields `daily_calorie_intake` and `target_date` are **never** sent to non-me
 
 ### 6. POST /api/pay
 
-Simulates a payment callback that activates the user's subscription. The `x-user-id` header **must equal** `body.userId`, and `body.assessmentId` must belong to that same user — a mismatch returns 403.
+Simulates a successful checkout callback that activates the user's subscription. It is still a mock provider, but the flow mirrors a production payment integration: the backend verifies ownership, records a payment row with provider metadata, uses an idempotency key to prevent duplicate charges, and activates the subscription in the same transaction.
 
-The endpoint is idempotent for an already-active subscription: repeated calls return `active` without rewriting the original activation timestamp or payment reference.
+The `x-user-id` header **must equal** `body.userId`, and `body.assessmentId` must belong to that same user — a mismatch returns 403.
+
+The endpoint is idempotent for an already-active subscription: repeated calls return `active` with the existing succeeded payment, without rewriting the original activation timestamp or payment reference.
 
 **Request body:**
 ```json
 {
   "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
-  "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264"
+  "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
+  "idempotencyKey": "checkout_attempt_1"
 }
 ```
 
 **Response 200:**
 ```json
-{ "status": "active" }
+{
+  "status": "active",
+  "payment": {
+    "id": "4a1db02e-7a0e-4c2a-9501-1bb3d75c8c72",
+    "provider": "mock",
+    "provider_ref": "mock_<stable_hash>",
+    "status": "succeeded",
+    "amount_cents": 1900,
+    "currency": "CNY"
+  }
+}
 ```
 
-**Errors:** `400 VALIDATION_ERROR` (invalid UUID), `403 FORBIDDEN` (x-user-id ≠ body.userId or assessment owner mismatch), `404 NOT_FOUND` (user/subscription/assessment not found)
+**Errors:** `400 VALIDATION_ERROR` (invalid UUID), `400 IDEMPOTENCY_CONFLICT` (key reused for another checkout), `403 FORBIDDEN` (x-user-id ≠ body.userId or assessment owner mismatch), `404 NOT_FOUND` (user/subscription/assessment not found)
 
 ---
 
@@ -461,7 +475,8 @@ curl -X POST "$API/api/pay" \
   -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1" \
   -d '{
     "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
-    "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264"
+    "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
+    "idempotencyKey": "manual-demo-replay"
   }'
 ```
 
@@ -510,7 +525,7 @@ Before a real public launch:
 | Area | Current demo implementation | Production requirement |
 |---|---|---|
 | Auth | Anonymous UUID in `localStorage` + `x-user-id` | Real auth provider, token validation, session expiry, user deletion/export path |
-| Payment | Mock `/api/pay` activation endpoint | Stripe/Creem/Paddle Checkout, signed webhook verification, idempotency keys, refund/cancel states |
+| Payment | Mock `/api/pay` provider with payment records, idempotency key, amount/currency/status, transactional subscription activation | Stripe/Creem/Paddle Checkout, signed webhook verification, refund/cancel states, provider reconciliation |
 | Medical safety | BMI/calorie estimate + health disclaimer | Stronger disclaimers, contraindication screening, escalation copy for unsafe inputs |
 | Operations | Local logs + GitHub CI | Request logging, error tracking, uptime checks, DB backup/restore playbook |
 | Abuse/rate limits | Ownership checks + validation | API rate limiting and bot protection |
@@ -644,11 +659,13 @@ See `apps/web/wrangler.toml` for reference build settings.
 | Submit accepts target weight above current weight | Integration | same | Guards the supported gain/reshape path and prevents old direction-lock regressions |
 | Non-member result: locked fields absent | Integration | `api/tests/integration/auth-diff.spec.ts` | Masking is a security requirement — absence must be asserted, not just presence of `locked:true` |
 | /pay unlocks → full result appears | Integration | same | End-to-end subscription state machine |
-| Repeated /pay is idempotent | Integration | same | Prevents duplicate demo activation from rewriting payment metadata |
+| Repeated /pay is idempotent | Integration | same | Prevents duplicate demo activation from rewriting subscription metadata |
+| Mock payment record is stored once per checkout attempt | Integration | same | Keeps simulated payment close to real provider semantics: payment row, provider ref, amount, currency, idempotency |
 | /pay rejects assessment owner mismatch | Integration | same | Prevents one user from unlocking against another user's assessment |
 | Session localStorage round-trip | Component | `web/tests/session.spec.ts` | session.ts is used by every API call |
 | Funnel starts with Pilates interest, auto-advances choices, and asks body data one field at a time | Component | `web/tests/funnel.spec.tsx` | Guards the low-pressure UX for the 5-stage flow |
-| Result page: pending generation, local preview, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the slow-backend fallback and optimistic unlock UI flow |
+| Result page: pending generation, local preview, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the slow-backend fallback, masked local preview, and backend-confirmed unlock flow |
+| Local payment flags cannot reveal full paid fields | Component | same | Ensures paid result data renders only after the backend confirms `member:true` |
 | Result restart clears local demo state | Component | same | Makes repeated interviewer demos deterministic |
 | Health disclaimer stays visible with results | Component | same | Keeps the medical boundary explicit |
 | Full funnel → masked → pay → unlock | E2E (Playwright) | `web/e2e/funnel.e2e.ts` | Only a real browser test proves the complete stack works together |

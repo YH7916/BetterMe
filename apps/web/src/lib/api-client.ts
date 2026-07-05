@@ -21,5 +21,15 @@ export const api = {
   saveStep: (id: string, data: StepUpdate) => req<Record<string, unknown>>(`/assessments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   submit: (id: string) => req<{ status: string }>(`/assessments/${id}/submit`, { method: 'POST' }),
   getResult: (id: string) => req<ResultResponse>(`/assessments/${id}/result`),
-  pay: (userId: string, assessmentId: string) => req<{ status: string }>('/pay', { method: 'POST', body: JSON.stringify({ userId, assessmentId }) }),
+  pay: (userId: string, assessmentId: string) => req<{
+    status: string;
+    payment: {
+      id: string;
+      provider: string;
+      provider_ref: string;
+      status: string;
+      amount_cents: number;
+      currency: string;
+    } | null;
+  }>('/pay', { method: 'POST', body: JSON.stringify({ userId, assessmentId }) }),
 };

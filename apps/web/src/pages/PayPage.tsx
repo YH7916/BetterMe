@@ -4,7 +4,6 @@ import { api } from '../lib/api-client';
 import { getAssessmentId, getUserId } from '../lib/session';
 import { getPendingAssessmentSession } from '../features/assessment/assessment-session';
 import { getMaskedResultPreview } from '../features/assessment/assessment-snapshot';
-import { markPaymentUnlocked } from '../features/payment/payment-session';
 
 function messageOf(err: unknown) {
   return err instanceof Error ? err.message : '支付失败，请稍后重试。';
@@ -36,8 +35,8 @@ export function PayPage() {
       if (!assessmentId || !userId) throw new Error('支付信息还未准备好，请先完成测评。');
 
       await api.pay(userId, assessmentId);
-      markPaymentUnlocked();
-      navigate('/result');
+      const result = await api.getResult(assessmentId);
+      navigate('/result', { state: { result } });
     } catch (err) {
       setError(messageOf(err));
     } finally {

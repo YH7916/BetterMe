@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stepUpdateSchema, submitSchema } from '../src/index';
+import { paySchema, stepUpdateSchema, submitSchema } from '../src/index';
 
 describe('stepUpdateSchema', () => {
   it('accepts a valid partial step', () => {
@@ -59,5 +59,25 @@ describe('submitSchema', () => {
       height_cm: 165, weight_kg, target_weight_kg, workout_frequency: 'light',
     });
     expect(r.success).toBe(true);
+  });
+});
+
+describe('paySchema', () => {
+  it('accepts an optional idempotency key for a checkout attempt', () => {
+    const r = paySchema.safeParse({
+      userId: '8404579c-776a-44ec-a2fe-74389b54bcc1',
+      assessmentId: 'ef0e9e76-0322-45af-89cc-f4b785c7b264',
+      idempotencyKey: 'checkout_attempt_1',
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects empty idempotency keys', () => {
+    const r = paySchema.safeParse({
+      userId: '8404579c-776a-44ec-a2fe-74389b54bcc1',
+      assessmentId: 'ef0e9e76-0322-45af-89cc-f4b785c7b264',
+      idempotencyKey: '',
+    });
+    expect(r.success).toBe(false);
   });
 });

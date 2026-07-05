@@ -163,6 +163,15 @@ describe('FunnelPage', () => {
     expect(await screen.findByText(/你平时喜欢普拉提吗/i)).toBeTruthy();
   });
 
+  it('does not show a loading state for a fresh visitor while creating the session', () => {
+    vi.mocked(client.api.createAssessment).mockReturnValue(new Promise<AssessmentSession>(() => undefined));
+
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><FunnelPage /></MemoryRouter>);
+
+    expect(screen.getByRole('heading', { name: /你平时喜欢普拉提吗/i })).toBeTruthy();
+    expect(screen.queryByText(/正在准备测评|加载中/i)).toBeNull();
+  });
+
   it('queues save until background session creation completes', async () => {
     let resolveSession: (value: AssessmentSession) => void;
     vi.mocked(client.api.createAssessment).mockReturnValue(new Promise((resolve) => {
@@ -287,7 +296,17 @@ describe('FunnelPage', () => {
     }));
     vi.spyOn(client.api, 'getResult').mockRejectedValue(new Error('result not ready'));
     vi.spyOn(client.api, 'getProgress').mockReturnValue(new Promise(() => undefined));
-    vi.spyOn(client.api, 'pay').mockResolvedValue({ status: 'active' });
+    vi.spyOn(client.api, 'pay').mockResolvedValue({
+      status: 'active',
+      payment: {
+        id: 'p1',
+        provider: 'mock',
+        provider_ref: 'mock_ref',
+        status: 'succeeded',
+        amount_cents: 1900,
+        currency: 'CNY',
+      },
+    });
 
     render(
       <MemoryRouter initialEntries={['/']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

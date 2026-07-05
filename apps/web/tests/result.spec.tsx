@@ -22,6 +22,18 @@ const fullResponse: ResultResponse = {
   },
 };
 
+const paymentResponse = {
+  status: 'active',
+  payment: {
+    id: 'p1',
+    provider: 'mock',
+    provider_ref: 'mock_ref',
+    status: 'succeeded',
+    amount_cents: 1900,
+    currency: 'CNY',
+  },
+};
+
 beforeEach(() => {
   localStorage.setItem('bm_user_id', 'u1');
   localStorage.setItem('bm_assessment_id', 'a1');
@@ -43,7 +55,7 @@ beforeEach(() => {
     status: 'completed',
   });
   vi.spyOn(client.api, 'submit').mockResolvedValue({ status: 'completed' });
-  vi.spyOn(client.api, 'pay').mockResolvedValue({ status: 'active' });
+  vi.spyOn(client.api, 'pay').mockResolvedValue(paymentResponse);
 });
 
 afterEach(() => {
@@ -208,6 +220,29 @@ describe('ResultPage', () => {
     render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
 
     expect(screen.getByText(/BMI/i)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /支付|解锁|pay/i })).toBeTruthy();
+  });
+
+  it('does not show full paid fields from local payment flags before the backend confirms membership', async () => {
+    sessionStorage.setItem('bm_payment_unlocked', '1');
+    sessionStorage.setItem('bm_assessment_snapshot', JSON.stringify({
+      gender: 'female',
+      primary_goal: 'lose_weight',
+      age: 28,
+      height_cm: 165,
+      weight_kg: 70,
+      target_weight_kg: 60,
+      workout_frequency: 'light',
+    }));
+    vi.mocked(client.api.getResult).mockReset();
+    vi.mocked(client.api.getResult).mockRejectedValue(new Error('result not ready'));
+    vi.spyOn(client.api, 'getProgress').mockReturnValue(new Promise(() => undefined));
+
+    render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><ResultPage /></MemoryRouter>);
+
+    expect(screen.queryByText(/会员已解锁/i)).toBeNull();
+    expect(screen.queryByText(/1680/)).toBeNull();
+    expect(screen.queryByText(/kcal/i)).toBeNull();
     expect(screen.getByRole('link', { name: /支付|解锁|pay/i })).toBeTruthy();
   });
 

@@ -4,6 +4,7 @@ import { userRepo } from '../../src/repositories/user.repository';
 import { assessmentRepo } from '../../src/repositories/assessment.repository';
 
 async function resetDb() {
+  await prisma.payment.deleteMany();
   await prisma.assessmentResult.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.subscription.deleteMany();

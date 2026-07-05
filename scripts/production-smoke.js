@@ -122,9 +122,17 @@ async function checkAssessmentFlow() {
   const pay = await fetchJson('/api/pay', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ userId: created.userId, assessmentId: created.assessmentId }),
+    body: JSON.stringify({
+      userId: created.userId,
+      assessmentId: created.assessmentId,
+      idempotencyKey: `smoke-${created.assessmentId}`,
+    }),
   });
   expect(pay.status === 'active', 'pay did not activate subscription');
+  expect(pay.payment?.provider === 'mock', 'pay did not return mock provider metadata');
+  expect(pay.payment?.status === 'succeeded', 'pay did not record a succeeded payment');
+  expect(pay.payment?.amount_cents === 1900, 'pay did not return expected amount');
+  expect(pay.payment?.currency === 'CNY', 'pay did not return expected currency');
 
   const full = await fetchJson(`/api/assessments/${created.assessmentId}/result`, { headers });
   expect(full.member === true, 'paid user should be a member');

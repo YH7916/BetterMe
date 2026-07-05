@@ -1,4 +1,4 @@
-import { ALGORITHM_VERSION, calcBmi, bmiCategory, calcDailyCalories, predictTargetDate } from '@betterme/shared';
+import { calcBmi, bmiCategory } from '@betterme/shared';
 import type { StepData } from '../../store/funnel';
 import type { ResultResponse } from '../result/types';
 
@@ -26,51 +26,6 @@ export function getMaskedResultPreview(): ResultResponse | null {
       bmi_category: bmiCategory(bmi),
       locked: true,
       message: LOCKED_MESSAGE,
-    },
-  };
-}
-
-export function getFullResultPreview(): ResultResponse | null {
-  const data = readSnapshot();
-  if (!data) return null;
-
-  const {
-    gender,
-    primary_goal,
-    age,
-    height_cm,
-    weight_kg,
-    target_weight_kg,
-    workout_frequency,
-  } = data;
-  if (
-    !gender ||
-    !primary_goal ||
-    !workout_frequency ||
-    typeof age !== 'number' ||
-    typeof height_cm !== 'number' ||
-    typeof weight_kg !== 'number' ||
-    typeof target_weight_kg !== 'number'
-  ) {
-    return null;
-  }
-
-  const bmi = calcBmi(weight_kg, height_cm);
-  return {
-    member: true,
-    result: {
-      bmi,
-      bmi_category: bmiCategory(bmi),
-      daily_calorie_intake: calcDailyCalories({
-        gender,
-        age,
-        heightCm: height_cm,
-        weightKg: weight_kg,
-        frequency: workout_frequency,
-        goal: primary_goal,
-      }),
-      target_date: predictTargetDate(weight_kg, target_weight_kg, new Date()).toISOString().slice(0, 10),
-      algorithm_version: ALGORITHM_VERSION,
     },
   };
 }

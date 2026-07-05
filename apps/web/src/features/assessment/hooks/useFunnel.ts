@@ -9,7 +9,7 @@ import { saveAssessmentSnapshot } from '../assessment-snapshot';
 export function useFunnel() {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<StepData>({});
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => !getAssessmentId());
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const initiated = useRef(false);

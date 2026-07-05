@@ -3,6 +3,8 @@ const prisma = new PrismaClient();
 
 const PAID_USER_ID = '8404579c-776a-44ec-a2fe-74389b54bcc1';
 const PAID_ASSESSMENT_ID = 'ef0e9e76-0322-45af-89cc-f4b785c7b264';
+const PAID_PAYMENT_REF = 'seed-paid';
+const PAID_PAYMENT_IDEMPOTENCY_KEY = `seed_checkout:${PAID_USER_ID}:${PAID_ASSESSMENT_ID}`;
 
 async function main() {
   const now = new Date();
@@ -22,13 +24,13 @@ async function main() {
         status: 'active',
         plan: 'pro',
         activatedAt: now,
-        paymentRef: 'seed-paid',
+        paymentRef: PAID_PAYMENT_REF,
       },
       update: {
         status: 'active',
         plan: 'pro',
         activatedAt: now,
-        paymentRef: 'seed-paid',
+        paymentRef: PAID_PAYMENT_REF,
       },
     });
 
@@ -76,6 +78,25 @@ async function main() {
         dailyCalorieIntake: 1680,
         targetDate,
         algorithmVersion: 'v1',
+      },
+    });
+
+    await tx.payment.upsert({
+      where: { idempotencyKey: PAID_PAYMENT_IDEMPOTENCY_KEY },
+      create: {
+        userId: PAID_USER_ID,
+        assessmentId: PAID_ASSESSMENT_ID,
+        provider: 'mock',
+        providerRef: PAID_PAYMENT_REF,
+        idempotencyKey: PAID_PAYMENT_IDEMPOTENCY_KEY,
+        status: 'succeeded',
+        amountCents: 1900,
+        currency: 'CNY',
+      },
+      update: {
+        status: 'succeeded',
+        amountCents: 1900,
+        currency: 'CNY',
       },
     });
   });

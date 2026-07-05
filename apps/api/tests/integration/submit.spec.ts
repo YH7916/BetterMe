@@ -5,6 +5,7 @@ import { createApp } from '../../src/app';
 const app = createApp();
 const h = (u: string) => ({ 'x-user-id': u, 'content-type': 'application/json' });
 async function resetDb() {
+  await prisma.payment.deleteMany();
   await prisma.assessmentResult.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.subscription.deleteMany();

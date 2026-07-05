@@ -48,9 +48,25 @@ erDiagram
         timestamp updated_at
     }
 
+    payments {
+        uuid id PK
+        uuid user_id FK
+        uuid assessment_id FK
+        text provider
+        text provider_ref
+        text idempotency_key
+        enum status "pending | succeeded | failed"
+        int amount_cents
+        text currency
+        timestamp created_at
+        timestamp updated_at
+    }
+
     users ||--o{ assessments : "has"
     assessments ||--o| assessment_results : "produces"
     users ||--o| subscriptions : "owns"
+    users ||--o{ payments : "pays"
+    assessments ||--o{ payments : "checked out by"
 ```
 
 ---
@@ -62,6 +78,7 @@ erDiagram
 | users → assessments | 1 : many | A user can start multiple assessments (abandoned sessions). Each assessment is independent. |
 | assessments → assessment_results | 1 : 0..1 | A result only exists after `POST /submit` succeeds. The `assessment_id` FK is `UNIQUE`, enforcing at most one result per assessment. |
 | users → subscriptions | 1 : 0..1 | Every user gets a `subscriptions` row on creation (status `inactive`). The first `POST /pay` updates it to `active`; repeated calls are idempotent. `user_id` FK is `UNIQUE`. |
+| users / assessments → payments | many : 1 | A mock checkout attempt is recorded before subscription activation. `idempotency_key` and `provider_ref` are unique so repeated callbacks do not create duplicate charges. |
 
 ---
 
@@ -83,6 +100,10 @@ Stores computed outputs only — no raw user inputs. The `algorithm_version` fie
 
 One row per user, created at user creation with `status = inactive`. This avoids a nullable join in the result query: `subscriptionRepo.findByUser()` always returns a row and the service just checks `status === 'active'`. Nullable fields (`plan`, `activated_at`, `payment_ref`) are set by the first `/pay` activation and kept stable on repeated demo unlock calls. They can be extended for real payment provider data (e.g. Stripe `payment_intent_id`) without a migration.
 
+### payments
+
+Records the simulated payment event with production-like semantics. The current provider is `mock`, but the table mirrors real checkout/webhook data: stable provider reference, caller-provided or server-derived idempotency key, amount in minor units, currency, and status. Subscription activation is performed in the same transaction as payment creation, so a successful mock payment cannot be half-applied. Repeated `/pay` calls return the existing succeeded payment instead of creating a second charge.
+
 ---
 
 ## Indexes
@@ -92,3 +113,6 @@ One row per user, created at user creation with `status = inactive`. This avoids
 | assessments | user_id | Non-unique index (`@@index`) | `requireOwnership` middleware looks up an assessment by `id` and then verifies `userId` — this covers the FK join for ownership checks |
 | assessment_results | assessment_id | Unique index (from `@unique`) | Enforces 1:1 constraint and makes `findUnique({ where: { assessmentId } })` efficient |
 | subscriptions | user_id | Unique index (from `@unique`) | Enforces 1:1 constraint and makes `findUnique({ where: { userId } })` efficient |
+| payments | idempotency_key | Unique index | Prevents duplicate charges for retried checkout callbacks |
+| payments | provider_ref | Unique index | Mirrors real provider event/payment IDs for replay-safe processing |
+| payments | user_id / assessment_id | Non-unique indexes | Supports payment history lookup by user or assessment |

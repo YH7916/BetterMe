@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api-client';
 import { clearSession, getAssessmentId } from '../lib/session';
 import { ResultView } from '../features/result/ResultView';
@@ -7,8 +7,7 @@ import { Paywall } from '../features/paywall/Paywall';
 import type { ResultResponse } from '../features/result/types';
 import type { ProgressResponse } from '@betterme/shared';
 import { clearPendingAssessmentSession, getPendingAssessmentSession } from '../features/assessment/assessment-session';
-import { clearAssessmentSnapshot, getFullResultPreview, getMaskedResultPreview } from '../features/assessment/assessment-snapshot';
-import { clearPaymentUnlocked, hasPaymentUnlocked } from '../features/payment/payment-session';
+import { clearAssessmentSnapshot, getMaskedResultPreview } from '../features/assessment/assessment-snapshot';
 
 const RESULT_POLL_MS = 1000;
 const GENERATION_ERROR_KEY = 'bm_result_generation_error';
@@ -36,10 +35,12 @@ function hasCompleteAssessmentInputs(progress: ProgressResponse) {
 
 export function ResultPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialResult = (location.state as { result?: ResultResponse } | null)?.result;
   const [state, setState] = useState<ResultResponse | null>(() => (
-    getAssessmentId() || getPendingAssessmentSession()
-      ? (hasPaymentUnlocked() ? getFullResultPreview() ?? getMaskedResultPreview() : getMaskedResultPreview())
-      : null
+    initialResult ?? ((getAssessmentId() || getPendingAssessmentSession())
+      ? getMaskedResultPreview()
+      : null)
   ));
   const [loadError, setLoadError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -65,7 +66,6 @@ export function ResultPage() {
       return true;
     }
     if (!hasCompleteAssessmentInputs(progress)) {
-      if (getFullResultPreview()) return false;
       throw new Error(INCOMPLETE_ASSESSMENT_MESSAGE);
     }
     await api.submit(assessmentId);
@@ -153,7 +153,6 @@ export function ResultPage() {
     clearSession();
     clearAssessmentSnapshot();
     clearPendingAssessmentSession();
-    clearPaymentUnlocked();
     sessionStorage.removeItem(GENERATION_ERROR_KEY);
     navigate('/');
   }

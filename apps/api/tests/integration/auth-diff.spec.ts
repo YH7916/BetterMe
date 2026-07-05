@@ -5,6 +5,7 @@ import { createApp } from '../../src/app';
 const app = createApp();
 const h = (u: string) => ({ 'x-user-id': u, 'content-type': 'application/json' });
 async function resetDb() {
+  await prisma.payment.deleteMany();
   await prisma.assessmentResult.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.subscription.deleteMany();
@@ -36,6 +37,13 @@ describe('differentiated result & pay unlock', () => {
     const { userId, assessmentId } = await completed();
     const pay = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify({ userId, assessmentId }) });
     expect(pay.status).toBe(200);
+    const payBody = await pay.json();
+    expect(payBody.payment).toMatchObject({
+      provider: 'mock',
+      status: 'succeeded',
+      amount_cents: 1900,
+      currency: 'CNY',
+    });
     const res = await app.request(`/api/assessments/${assessmentId}/result`, { headers: h(userId) });
     const body = await res.json();
     expect(body.member).toBe(true);
@@ -59,6 +67,52 @@ describe('differentiated result & pay unlock', () => {
     expect(secondSubscription.status).toBe('active');
     expect(secondSubscription.paymentRef).toBe(firstSubscription.paymentRef);
     expect(secondSubscription.activatedAt?.getTime()).toBe(firstSubscription.activatedAt?.getTime());
+  });
+
+  it('stores one idempotent mock payment record per checkout attempt', async () => {
+    const { userId, assessmentId } = await completed();
+    const payload = { userId, assessmentId, idempotencyKey: 'checkout_attempt_1' };
+
+    const first = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify(payload) });
+    const firstBody = await first.json();
+    const second = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify(payload) });
+    const secondBody = await second.json();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(secondBody.payment.id).toBe(firstBody.payment.id);
+    expect(secondBody.payment.provider_ref).toBe(firstBody.payment.provider_ref);
+
+    const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "payments"
+      WHERE "user_id" = ${userId} AND "assessment_id" = ${assessmentId}
+    `;
+    expect(Number(rows[0]?.count ?? 0)).toBe(1);
+  });
+
+  it('does not create a second charge when the subscription is already active', async () => {
+    const { userId, assessmentId } = await completed();
+    await app.request('/api/pay', {
+      method: 'POST',
+      headers: h(userId),
+      body: JSON.stringify({ userId, assessmentId, idempotencyKey: 'first_checkout' }),
+    });
+
+    const second = await app.request('/api/pay', {
+      method: 'POST',
+      headers: h(userId),
+      body: JSON.stringify({ userId, assessmentId, idempotencyKey: 'second_checkout' }),
+    });
+    const secondBody = await second.json();
+
+    expect(secondBody.status).toBe('active');
+    const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint AS count
+      FROM "payments"
+      WHERE "user_id" = ${userId} AND "assessment_id" = ${assessmentId}
+    `;
+    expect(Number(rows[0]?.count ?? 0)).toBe(1);
   });
 
   it('rejects paying for another user (403)', async () => {

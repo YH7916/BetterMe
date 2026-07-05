@@ -1,6 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { createApp } from '../../src/app';
 
+describe('GET /', () => {
+  it('renders the API control dashboard', async () => {
+    const app = createApp();
+    const res = await app.request('/');
+    const html = await res.text();
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/html');
+    expect(html).toContain('BetterMe API Control');
+    expect(html).toContain('/api/health');
+    expect(html).toContain('/api/pay');
+  });
+});
+
 describe('GET /api/health', () => {
   it('returns ok', async () => {
     const app = createApp();

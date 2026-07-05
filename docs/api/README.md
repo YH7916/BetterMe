@@ -264,7 +264,9 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 
 ### 6. POST /api/pay
 
-Simulates a payment callback that activates the caller's subscription. The `x-user-id` header is verified against `body.userId`, and `body.assessmentId` must belong to the same user. This prevents one user from unlocking another user's subscription or paying against another user's assessment.
+Simulates a successful checkout callback that activates the caller's subscription. It is still a mock provider, but the flow mirrors a production payment integration: the API verifies caller ownership, records a payment row with amount/currency/provider metadata, uses an idempotency key to prevent duplicate charges, and activates the subscription in the same transaction.
+
+The `x-user-id` header is verified against `body.userId`, and `body.assessmentId` must belong to the same user. This prevents one user from unlocking another user's subscription or paying against another user's assessment.
 
 **Request:**
 ```http
@@ -274,23 +276,35 @@ x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1
 
 {
   "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
-  "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264"
+  "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
+  "idempotencyKey": "checkout_attempt_1"
 }
 ```
 
-The `assessmentId` field is required by `paySchema` (Zod) and is checked against assessment ownership before the subscription is activated.
+The `assessmentId` field is required by `paySchema` (Zod) and is checked against assessment ownership before the subscription is activated. `idempotencyKey` is optional; if omitted, the server derives a stable key from the current user and assessment.
 
-The endpoint is idempotent for an already-active subscription: repeated calls return `{ "status": "active" }` without rewriting `payment_ref` or `activated_at`.
+The endpoint is idempotent for an already-active subscription: repeated calls return `{ "status": "active" }` with the existing succeeded payment and do not rewrite `payment_ref` or `activated_at`.
 
 **Response 200:**
 ```json
-{ "status": "active" }
+{
+  "status": "active",
+  "payment": {
+    "id": "4a1db02e-7a0e-4c2a-9501-1bb3d75c8c72",
+    "provider": "mock",
+    "provider_ref": "mock_<stable_hash>",
+    "status": "succeeded",
+    "amount_cents": 1900,
+    "currency": "CNY"
+  }
+}
 ```
 
-**After a successful /pay call**, the next call to `GET /api/assessments/:id/result` returns the full (unmasked) result.
+**After a successful /pay call**, the next call to `GET /api/assessments/:id/result` returns the full (unmasked) result. The frontend does not trust local payment flags for full paid data; paid fields render only after the backend returns `member: true`.
 
 **Errors:**
 - `400 VALIDATION_ERROR` — `userId` or `assessmentId` is not a valid UUID
+- `400 IDEMPOTENCY_CONFLICT` — an idempotency key is reused for another checkout
 - `403 FORBIDDEN` — `x-user-id` header does not equal `body.userId`, or `assessmentId` belongs to another user
 - `404 NOT_FOUND` — no subscription row exists for this user, or the assessment does not exist
 
@@ -320,6 +334,7 @@ curl -X POST https://api.betterme.yesterhaze.codes/api/pay \
   -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1" \
   -d '{
     "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
-    "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264"
+    "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
+    "idempotencyKey": "manual-demo-replay"
   }'
 ```
