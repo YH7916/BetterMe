@@ -17,7 +17,7 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@betterme/shared": "workspace:*",
-    "@hono/node-server": "^1.13.0",
+    "@hono/node-server": "^2.0.8",
     "@hono/swagger-ui": "^0.6.1",
     "@prisma/client": "^5.20.0",
     "hono": "^4.6.0",
