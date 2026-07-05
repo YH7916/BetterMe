@@ -4,13 +4,21 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "lint": "eslint src tests --max-warnings=0",
     "lint:fix": "eslint src tests --fix",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": { "zod": "^3.23.0" },
-  "devDependencies": { "typescript": "^5.6.0", "vitest": "^2.1.0" }
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.9",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
 }

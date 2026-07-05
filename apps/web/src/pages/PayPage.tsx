@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api-client';
-import { getAssessmentId, getUserId } from '../lib/session';
+import { getAssessmentId } from '../lib/session';
 import { getPendingAssessmentSession } from '../features/assessment/assessment-session';
 import { getMaskedResultPreview } from '../features/assessment/assessment-snapshot';
 
@@ -31,10 +31,9 @@ export function PayPage() {
     setError(null);
     try {
       const assessmentId = await resolveAssessmentIdForPay();
-      const userId = getUserId();
-      if (!assessmentId || !userId) throw new Error('支付信息还未准备好，请先完成测评。');
+      if (!assessmentId) throw new Error('支付信息还未准备好，请先完成测评。');
 
-      await api.pay(userId, assessmentId);
+      await api.pay(assessmentId);
       const result = await api.getResult(assessmentId);
       navigate('/result', { state: { result } });
     } catch (err) {

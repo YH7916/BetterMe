@@ -11,7 +11,7 @@ describe('GET /', () => {
     expect(res.headers.get('content-type')).toContain('text/html');
     expect(html).toContain('BetterMe API Control');
     expect(html).toContain('/api/health');
-    expect(html).toContain('/api/pay');
+    expect(html).toContain('/api/v1/pay');
   });
 });
 

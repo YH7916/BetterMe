@@ -10,6 +10,14 @@ erDiagram
         timestamp updated_at
     }
 
+    sessions {
+        uuid id PK
+        text token UK "opaque bearer token"
+        uuid user_id FK
+        timestamp expires_at
+        timestamp created_at
+    }
+
     assessments {
         uuid id PK
         uuid user_id FK
@@ -63,6 +71,7 @@ erDiagram
     }
 
     users ||--o{ assessments : "has"
+    users ||--o{ sessions : "authenticates via"
     assessments ||--o| assessment_results : "produces"
     users ||--o| subscriptions : "owns"
     users ||--o{ payments : "pays"
@@ -76,6 +85,7 @@ erDiagram
 | Relationship | Cardinality | Notes |
 |---|---|---|
 | users → assessments | 1 : many | A user can start multiple assessments (abandoned sessions). Each assessment is independent. |
+| users → sessions | 1 : many | Each `POST /assessments` mints a session row carrying an opaque bearer token and an expiry. Deleting a user cascade-deletes its sessions. |
 | assessments → assessment_results | 1 : 0..1 | A result only exists after `POST /submit` succeeds. The `assessment_id` FK is `UNIQUE`, enforcing at most one result per assessment. |
 | users → subscriptions | 1 : 0..1 | Every user gets a `subscriptions` row on creation (status `inactive`). The first `POST /pay` updates it to `active`; repeated calls are idempotent. `user_id` FK is `UNIQUE`. |
 | users / assessments → payments | many : 1 | A mock checkout attempt is recorded before subscription activation. `idempotency_key` and `provider_ref` are unique so repeated callbacks do not create duplicate charges. |
@@ -86,7 +96,11 @@ erDiagram
 
 ### users
 
-Intentionally minimal. The system uses anonymous sessions — there is no email, password, or display name. `id` is a server-generated UUID returned to the frontend for subsequent requests. `created_at` / `updated_at` are standard audit timestamps managed by Prisma.
+Intentionally minimal. The system uses anonymous sessions — there is no email, password, or display name. `id` is a server-generated UUID kept **server-side only**; the client authenticates with a separate session token (see `sessions`), never with the user id. `created_at` / `updated_at` are standard audit timestamps managed by Prisma.
+
+### sessions
+
+Holds the capability tokens that authenticate requests. Each row is `{ token, user_id, expires_at }`. The `token` is a 32-byte random hex string (unguessable) with a `UNIQUE` index, resolved to a `user_id` by the auth middleware on every protected request; rows past `expires_at` are rejected (401). Keeping the credential in its own table — separate from the resource-owner `users.id` — means a leaked token can be expired or revoked without touching user data, and the id used to scope resources is never exposed to clients. `ON DELETE CASCADE` ties sessions to their user for clean erasure.
 
 ### assessments
 
@@ -110,6 +124,8 @@ Records the simulated payment event with production-like semantics. The current 
 
 | Table | Column | Type | Reason |
 |---|---|---|---|
+| sessions | token | Unique index (from `@unique`) | Auth middleware resolves a bearer token to a user on every protected request — must be a fast, unique lookup |
+| sessions | user_id | Non-unique index (`@@index`) | Supports listing/revoking a user's sessions and cascade deletes |
 | assessments | user_id | Non-unique index (`@@index`) | `requireOwnership` middleware looks up an assessment by `id` and then verifies `userId` — this covers the FK join for ownership checks |
 | assessment_results | assessment_id | Unique index (from `@unique`) | Enforces 1:1 constraint and makes `findUnique({ where: { assessmentId } })` efficient |
 | subscriptions | user_id | Unique index (from `@unique`) | Enforces 1:1 constraint and makes `findUnique({ where: { userId } })` efficient |

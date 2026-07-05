@@ -2,6 +2,8 @@
 
 > This document is a required deliverable for the 【睿迄科技】全栈开发 3 天挑战. It covers how AI assistance was used during the build, and — more importantly — where developer judgment overrode AI suggestions and why.
 
+> **Note (post-challenge):** the repo later went through an enterprise-hardening pass. Some specifics below describe the original 3-day build — most notably the auth model, which was `x-user-id` then and is now an opaque capability token (`Authorization: Bearer`, backed by a `sessions` table). The reasoning captured here still holds; only the concrete mechanism evolved. See the root README for the current state.
+
 ---
 
 ## How AI Was Used

@@ -8,7 +8,7 @@ import * as client from '../src/lib/api-client';
 import { clearPendingAssessmentSession } from '../src/features/assessment/assessment-session';
 
 interface AssessmentSession {
-  userId: string;
+  token: string;
   assessmentId: string;
   currentStep: number;
 }
@@ -16,7 +16,7 @@ interface AssessmentSession {
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
-  vi.spyOn(client.api, 'createAssessment').mockResolvedValue({ userId: 'u1', assessmentId: 'a1', currentStep: 0 });
+  vi.spyOn(client.api, 'createAssessment').mockResolvedValue({ token: 't1', assessmentId: 'a1', currentStep: 0 });
   vi.spyOn(client.api, 'saveStep').mockResolvedValue({} as never);
 });
 
@@ -184,7 +184,7 @@ describe('FunnelPage', () => {
     expect(await screen.findByRole('heading', { name: /你更希望通过普拉提改善什么/i })).toBeTruthy();
     expect(client.api.saveStep).not.toHaveBeenCalled();
 
-    resolveSession!({ userId: 'u1', assessmentId: 'a1', currentStep: 0 });
+    resolveSession!({ token: 't1', assessmentId: 'a1', currentStep: 0 });
     await waitFor(() => expect(client.api.saveStep).toHaveBeenCalledWith('a1', { current_step: 1 }));
   });
 
@@ -273,7 +273,7 @@ describe('FunnelPage', () => {
 
     await completeFunnel();
     expect(await screen.findByText(/Result route ready/i)).toBeTruthy();
-    resolveSession!({ userId: 'u1', assessmentId: 'a1', currentStep: 0 });
+    resolveSession!({ token: 't1', assessmentId: 'a1', currentStep: 0 });
 
     await waitFor(() => expect(client.api.saveStep).toHaveBeenCalledTimes(1));
     expect(client.api.saveStep).toHaveBeenCalledWith('a1', {
@@ -325,8 +325,8 @@ describe('FunnelPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /确认支付|立即解锁/i }));
     expect(client.api.pay).not.toHaveBeenCalled();
 
-    resolveSession!({ userId: 'u1', assessmentId: 'a1', currentStep: 0 });
+    resolveSession!({ token: 't1', assessmentId: 'a1', currentStep: 0 });
 
-    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('u1', 'a1'));
+    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('a1'));
   });
 });

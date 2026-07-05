@@ -1,6 +1,6 @@
 const frontendUrl = 'https://betterme.yesterhaze.codes';
 const githubUrl = 'https://github.com/YH7916/BetterMe';
-const paidUserId = '8404579c-776a-44ec-a2fe-74389b54bcc1';
+const paidToken = 'seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000';
 const paidAssessmentId = 'ef0e9e76-0322-45af-89cc-f4b785c7b264';
 
 export function renderApiDashboard() {
@@ -382,28 +382,38 @@ export function renderApiDashboard() {
           </a>
           <div class="endpoint-row">
             <span class="method">POST</span>
-            <code>/api/assessments</code>
-            <span>创建匿名测评会话</span>
+            <code>/api/v1/assessments</code>
+            <span>创建匿名测评会话（返回 token）</span>
           </div>
           <div class="endpoint-row">
             <span class="method">PATCH</span>
-            <code>/api/assessments/:id</code>
+            <code>/api/v1/assessments/:id</code>
             <span>分步保存测评进度</span>
           </div>
           <div class="endpoint-row">
             <span class="method">POST</span>
-            <code>/api/assessments/:id/submit</code>
+            <code>/api/v1/assessments/:id/submit</code>
             <span>计算并持久化结果</span>
           </div>
           <div class="endpoint-row">
             <span class="method">GET</span>
-            <code>/api/assessments/:id/result</code>
+            <code>/api/v1/assessments/:id/result</code>
             <span>脱敏或完整结果</span>
           </div>
           <div class="endpoint-row">
+            <span class="method">DELETE</span>
+            <code>/api/v1/assessments/:id</code>
+            <span>删除测评及派生数据（GDPR）</span>
+          </div>
+          <div class="endpoint-row">
             <span class="method">POST</span>
-            <code>/api/pay</code>
+            <code>/api/v1/pay</code>
             <span>模拟支付解锁</span>
+          </div>
+          <div class="endpoint-row">
+            <span class="method">GET</span>
+            <code>/api/v1/docs</code>
+            <span>OpenAPI / Swagger UI</span>
           </div>
         </div>
       </section>
@@ -411,12 +421,12 @@ export function renderApiDashboard() {
       <section class="section">
         <div class="section-head">
           <h2>Paid Demo Session</h2>
-          <p>用于直接验证会员完整结果返回。</p>
+          <p>用于直接验证会员完整结果返回（作为 <code>Authorization: Bearer &lt;token&gt;</code> 传入）。</p>
         </div>
         <div class="session-list">
           <div class="session-row">
-            <span>PAID_TEST_USER_ID</span>
-            <code>${paidUserId}</code>
+            <span>PAID_TEST_TOKEN</span>
+            <code>${paidToken}</code>
           </div>
           <div class="session-row">
             <span>PAID_TEST_ASSESSMENT_ID</span>

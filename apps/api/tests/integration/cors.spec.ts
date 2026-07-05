@@ -9,9 +9,9 @@ describe('CORS', () => {
   });
   it('answers OPTIONS preflight for a mutating route', async () => {
     const app = createApp();
-    const res = await app.request('/api/assessments/x', {
+    const res = await app.request('/api/v1/assessments/x', {
       method: 'OPTIONS',
-      headers: { Origin: 'https://example.pages.dev', 'Access-Control-Request-Method': 'PATCH', 'Access-Control-Request-Headers': 'x-user-id' },
+      headers: { Origin: 'https://example.pages.dev', 'Access-Control-Request-Method': 'PATCH', 'Access-Control-Request-Headers': 'authorization' },
     });
     expect([200, 204]).toContain(res.status);
     expect(res.headers.get('access-control-allow-methods')).toContain('PATCH');

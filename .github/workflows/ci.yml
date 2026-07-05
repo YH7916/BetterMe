@@ -36,6 +36,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         name: "Install dependencies"
+      - run: pnpm audit --audit-level=high
+        name: "Audit dependencies (advisory)"
+        continue-on-error: true
       - run: pnpm --filter @betterme/api exec prisma migrate deploy
         name: "Apply DB migrations"
       - run: pnpm --filter @betterme/api exec prisma generate
@@ -44,5 +47,9 @@ jobs:
         name: "Lint"
       - run: pnpm typecheck
         name: "Typecheck"
+      - run: pnpm --filter @betterme/api build
+        name: "Build API"
       - run: pnpm test
         name: "Run tests"
+      - run: pnpm --filter @betterme/shared test --coverage
+        name: "Core algorithm coverage gate"

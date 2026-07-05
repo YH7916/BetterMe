@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getUserId, setUserId, getAssessmentId, setAssessmentId } from '../src/lib/session';
+import { getToken, setToken, getAssessmentId, setAssessmentId } from '../src/lib/session';
 
 describe('session', () => {
   beforeEach(() => localStorage.clear());
-  it('stores and reads user id', () => {
-    expect(getUserId()).toBeNull();
-    setUserId('u1');
-    expect(getUserId()).toBe('u1');
+  it('stores and reads the session token', () => {
+    expect(getToken()).toBeNull();
+    setToken('t1');
+    expect(getToken()).toBe('t1');
   });
   it('stores and reads assessment id', () => {
     expect(getAssessmentId()).toBeNull();

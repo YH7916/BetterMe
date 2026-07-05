@@ -1,17 +1,22 @@
 import type { StepUpdate } from '@betterme/shared';
 import { submitSchema, calcBmi, bmiCategory, calcDailyCalories, predictTargetDate, ALGORITHM_VERSION } from '@betterme/shared';
+import { randomBytes } from 'node:crypto';
 import { AppError } from '../lib/errors';
 import { userRepo } from '../repositories/user.repository';
 import { assessmentRepo } from '../repositories/assessment.repository';
 import { resultRepo } from '../repositories/result.repository';
 import { prisma } from '../lib/prisma';
 
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
 export const assessmentService = {
   async start() {
-    const user = await userRepo.createWithAssessment();
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    const user = await userRepo.createWithAssessment({ token, expiresAt });
     const a = user.assessments[0];
     if (!a) throw new Error('assessment creation failed');
-    return { userId: user.id, assessmentId: a.id, currentStep: a.currentStep };
+    return { token, assessmentId: a.id, currentStep: a.currentStep };
   },
   async getProgress(id: string) {
     const a = await assessmentRepo.findById(id);
@@ -48,5 +53,17 @@ export const assessmentService = {
       await assessmentRepo.markCompleted(id, tx);
     });
     return { status: 'completed' as const };
+  },
+  /**
+   * Permanently deletes an assessment and everything derived from it
+   * (payments, computed result). Idempotent from the caller's perspective:
+   * ownership is verified upstream, so a repeat call simply 404s.
+   */
+  async remove(id: string) {
+    await prisma.$transaction([
+      prisma.payment.deleteMany({ where: { assessmentId: id } }),
+      prisma.assessmentResult.deleteMany({ where: { assessmentId: id } }),
+      prisma.assessment.delete({ where: { id } }),
+    ]);
   },
 };

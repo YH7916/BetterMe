@@ -1,5 +1,5 @@
 import { api } from '../../lib/api-client';
-import { getAssessmentId, setAssessmentId, setUserId } from '../../lib/session';
+import { getAssessmentId, setAssessmentId, setToken } from '../../lib/session';
 
 let assessmentSessionPromise: Promise<string> | null = null;
 
@@ -18,7 +18,7 @@ export function ensureAssessmentSession() {
 
   assessmentSessionPromise = api.createAssessment()
     .then((session) => {
-      setUserId(session.userId);
+      setToken(session.token);
       setAssessmentId(session.assessmentId);
       return session.assessmentId;
     })

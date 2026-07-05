@@ -3,27 +3,28 @@ import { prisma } from '../../src/lib/prisma';
 import { createApp } from '../../src/app';
 
 const app = createApp();
-const h = (u: string) => ({ 'x-user-id': u, 'content-type': 'application/json' });
+const h = (token: string) => ({ authorization: `Bearer ${token}`, 'content-type': 'application/json' });
 async function resetDb() {
   await prisma.payment.deleteMany();
   await prisma.assessmentResult.deleteMany();
   await prisma.assessment.deleteMany();
   await prisma.subscription.deleteMany();
+  await prisma.session.deleteMany();
   await prisma.user.deleteMany();
 }
 async function completed() {
-  const { userId, assessmentId } = await (await app.request('/api/assessments', { method: 'POST' })).json();
-  await app.request(`/api/assessments/${assessmentId}`, { method: 'PATCH', headers: h(userId), body: JSON.stringify({ gender: 'female', primary_goal: 'lose_weight', age: 28, height_cm: 165, weight_kg: 70, target_weight_kg: 60, workout_frequency: 'light', current_step: 4 }) });
-  await app.request(`/api/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(userId) });
-  return { userId, assessmentId };
+  const { token, assessmentId } = await (await app.request('/api/v1/assessments', { method: 'POST' })).json();
+  await app.request(`/api/v1/assessments/${assessmentId}`, { method: 'PATCH', headers: h(token), body: JSON.stringify({ gender: 'female', primary_goal: 'lose_weight', age: 28, height_cm: 165, weight_kg: 70, target_weight_kg: 60, workout_frequency: 'light', current_step: 4 }) });
+  await app.request(`/api/v1/assessments/${assessmentId}/submit`, { method: 'POST', headers: h(token) });
+  return { token, assessmentId };
 }
 
 describe('differentiated result & pay unlock', () => {
   beforeEach(resetDb);
 
   it('non-member gets masked result (no protected fields)', async () => {
-    const { userId, assessmentId } = await completed();
-    const res = await app.request(`/api/assessments/${assessmentId}/result`, { headers: h(userId) });
+    const { token, assessmentId } = await completed();
+    const res = await app.request(`/api/v1/assessments/${assessmentId}/result`, { headers: h(token) });
     const body = await res.json();
     expect(body.member).toBe(false);
     expect(body.result.bmi).toBeDefined();
@@ -34,8 +35,8 @@ describe('differentiated result & pay unlock', () => {
   });
 
   it('after /pay the same result becomes full', async () => {
-    const { userId, assessmentId } = await completed();
-    const pay = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify({ userId, assessmentId }) });
+    const { token, assessmentId } = await completed();
+    const pay = await app.request('/api/v1/pay', { method: 'POST', headers: h(token), body: JSON.stringify({ assessmentId }) });
     expect(pay.status).toBe(200);
     const payBody = await pay.json();
     expect(payBody.payment).toMatchObject({
@@ -44,7 +45,7 @@ describe('differentiated result & pay unlock', () => {
       amount_cents: 1900,
       currency: 'CNY',
     });
-    const res = await app.request(`/api/assessments/${assessmentId}/result`, { headers: h(userId) });
+    const res = await app.request(`/api/v1/assessments/${assessmentId}/result`, { headers: h(token) });
     const body = await res.json();
     expect(body.member).toBe(true);
     expect(body.result.daily_calorie_intake).toBeGreaterThan(0);
@@ -54,15 +55,16 @@ describe('differentiated result & pay unlock', () => {
   });
 
   it('keeps repeated pay calls idempotent for the same user', async () => {
-    const { userId, assessmentId } = await completed();
+    const { token, assessmentId } = await completed();
 
-    const first = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify({ userId, assessmentId }) });
+    const first = await app.request('/api/v1/pay', { method: 'POST', headers: h(token), body: JSON.stringify({ assessmentId }) });
     expect(first.status).toBe(200);
-    const firstSubscription = await prisma.subscription.findUniqueOrThrow({ where: { userId } });
+    const owner = await prisma.session.findFirstOrThrow({ where: { token }, select: { userId: true } });
+    const firstSubscription = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
 
-    const second = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify({ userId, assessmentId }) });
+    const second = await app.request('/api/v1/pay', { method: 'POST', headers: h(token), body: JSON.stringify({ assessmentId }) });
     expect(second.status).toBe(200);
-    const secondSubscription = await prisma.subscription.findUniqueOrThrow({ where: { userId } });
+    const secondSubscription = await prisma.subscription.findUniqueOrThrow({ where: { userId: owner.userId } });
 
     expect(secondSubscription.status).toBe('active');
     expect(secondSubscription.paymentRef).toBe(firstSubscription.paymentRef);
@@ -70,12 +72,12 @@ describe('differentiated result & pay unlock', () => {
   });
 
   it('stores one idempotent mock payment record per checkout attempt', async () => {
-    const { userId, assessmentId } = await completed();
-    const payload = { userId, assessmentId, idempotencyKey: 'checkout_attempt_1' };
+    const { token, assessmentId } = await completed();
+    const payload = { assessmentId, idempotencyKey: 'checkout_attempt_1' };
 
-    const first = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify(payload) });
+    const first = await app.request('/api/v1/pay', { method: 'POST', headers: h(token), body: JSON.stringify(payload) });
     const firstBody = await first.json();
-    const second = await app.request('/api/pay', { method: 'POST', headers: h(userId), body: JSON.stringify(payload) });
+    const second = await app.request('/api/v1/pay', { method: 'POST', headers: h(token), body: JSON.stringify(payload) });
     const secondBody = await second.json();
 
     expect(first.status).toBe(200);
@@ -83,55 +85,53 @@ describe('differentiated result & pay unlock', () => {
     expect(secondBody.payment.id).toBe(firstBody.payment.id);
     expect(secondBody.payment.provider_ref).toBe(firstBody.payment.provider_ref);
 
+    const owner = await prisma.session.findFirstOrThrow({ where: { token }, select: { userId: true } });
     const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
       FROM "payments"
-      WHERE "user_id" = ${userId} AND "assessment_id" = ${assessmentId}
+      WHERE "user_id" = ${owner.userId} AND "assessment_id" = ${assessmentId}
     `;
     expect(Number(rows[0]?.count ?? 0)).toBe(1);
   });
 
   it('does not create a second charge when the subscription is already active', async () => {
-    const { userId, assessmentId } = await completed();
-    await app.request('/api/pay', {
-      method: 'POST',
-      headers: h(userId),
-      body: JSON.stringify({ userId, assessmentId, idempotencyKey: 'first_checkout' }),
+    const { token, assessmentId } = await completed();
+    await app.request('/api/v1/pay', {
+      method: 'POST', headers: h(token),
+      body: JSON.stringify({ assessmentId, idempotencyKey: 'first_checkout' }),
     });
 
-    const second = await app.request('/api/pay', {
-      method: 'POST',
-      headers: h(userId),
-      body: JSON.stringify({ userId, assessmentId, idempotencyKey: 'second_checkout' }),
+    const second = await app.request('/api/v1/pay', {
+      method: 'POST', headers: h(token),
+      body: JSON.stringify({ assessmentId, idempotencyKey: 'second_checkout' }),
     });
     const secondBody = await second.json();
 
     expect(secondBody.status).toBe('active');
+    const owner = await prisma.session.findFirstOrThrow({ where: { token }, select: { userId: true } });
     const rows = await prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::bigint AS count
       FROM "payments"
-      WHERE "user_id" = ${userId} AND "assessment_id" = ${assessmentId}
+      WHERE "user_id" = ${owner.userId} AND "assessment_id" = ${assessmentId}
     `;
     expect(Number(rows[0]?.count ?? 0)).toBe(1);
   });
 
-  it('rejects paying for another user (403)', async () => {
-    const { userId, assessmentId } = await completed();
-    const res = await app.request('/api/pay', {
-      method: 'POST',
-      headers: h(userId),
-      body: JSON.stringify({ userId: '00000000-0000-0000-0000-000000000000', assessmentId }),
+  it('rejects paying without a token (401)', async () => {
+    const { assessmentId } = await completed();
+    const res = await app.request('/api/v1/pay', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ assessmentId }),
     });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(401);
   });
 
-  it('rejects paying with an assessment owned by another user (403)', async () => {
+  it('rejects paying for an assessment owned by another user (403)', async () => {
     const caller = await completed();
     const other = await completed();
-    const res = await app.request('/api/pay', {
-      method: 'POST',
-      headers: h(caller.userId),
-      body: JSON.stringify({ userId: caller.userId, assessmentId: other.assessmentId }),
+    const res = await app.request('/api/v1/pay', {
+      method: 'POST', headers: h(caller.token),
+      body: JSON.stringify({ assessmentId: other.assessmentId }),
     });
     expect(res.status).toBe(403);
   });

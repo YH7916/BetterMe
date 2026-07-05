@@ -15,17 +15,18 @@ Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-d
 | Frontend demo | https://betterme.yesterhaze.codes |
 | Frontend fallback | https://betterme-4j4.pages.dev |
 | API dashboard | https://api.betterme.yesterhaze.codes |
-| Backend API base | https://api.betterme.yesterhaze.codes/api |
+| Backend API base | https://api.betterme.yesterhaze.codes/api/v1 |
+| API docs (Swagger) | https://api.betterme.yesterhaze.codes/api/v1/docs |
 | Health check | https://api.betterme.yesterhaze.codes/api/health |
 | Readiness check | https://api.betterme.yesterhaze.codes/api/ready |
 | GitHub repository | https://github.com/YH7916/BetterMe |
 | CI | https://github.com/YH7916/BetterMe/actions/workflows/ci.yml |
 | Production monitor | https://github.com/YH7916/BetterMe/actions/workflows/monitor.yml |
 
-Production paid demo credentials:
+Production paid demo credentials (send as `Authorization: Bearer <token>`):
 
 ```bash
-PAID_TEST_USER_ID=8404579c-776a-44ec-a2fe-74389b54bcc1
+PAID_TEST_TOKEN=seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000
 PAID_TEST_ASSESSMENT_ID=ef0e9e76-0322-45af-89cc-f4b785c7b264
 ```
 
@@ -43,8 +44,7 @@ PAID_TEST_ASSESSMENT_ID=ef0e9e76-0322-45af-89cc-f4b785c7b264
 ┌───────────────────────────────▼─────────────────────────────────────┐
 │  Railway Node service                                                │
 │  apps/api  (Hono + Prisma)                                          │
-│  routes → middlewares → controllers → services → repositories       │
-│  Optionally: Cloudflare Workers via src/worker.ts (see §Deployment) │
+│  routes → auth → rate-limit → controllers → services → repositories │
 └───────────────────────────────┬─────────────────────────────────────┘
                                 │  Prisma ORM
 ┌───────────────────────────────▼─────────────────────────────────────┐
@@ -90,10 +90,9 @@ betterme/
 │   │   │   ├── lib/          # prisma singleton / errors / serializers
 │   │   │   ├── config/env.ts
 │   │   │   ├── app.ts        # createApp() — used by tests + server.ts
-│   │   │   ├── server.ts     # Node HTTP entry (primary)
-│   │   │   └── worker.ts     # Cloudflare Workers entry (optional)
+│   │   │   └── server.ts     # Node HTTP entry
 │   │   ├── tests/integration/
-│   │   ├── wrangler.toml     # Workers optional config
+│   │   ├── Dockerfile        # reproducible container image
 │   │   └── package.json
 │   └── web/                  # Vite + React frontend
 │       ├── src/
@@ -283,16 +282,18 @@ The smoke monitor checks:
 - `/api/health` returns a live API process
 - `/api/ready` confirms the API can query Supabase Postgres
 - full anonymous funnel path: create assessment -> save -> submit -> masked result
-- mock unlock path: `/api/pay` -> full member result
+- mock unlock path: `/api/v1/pay` -> full member result
 - seeded paid demo session still returns member-only fields
 
 ---
 
 ## API Documentation
 
-All endpoints are prefixed with `/api`. Demo authentication uses the `x-user-id` header (a UUID returned by `POST /assessments` and stored in `localStorage`). No cookies, no JWT. This is intentionally simple for the challenge; production auth should replace it before a real launch.
+All endpoints are prefixed with `/api/v1` (health/readiness live at `/api`). Authentication uses a **capability token**: `POST /assessments` issues an opaque, unguessable session token (backed by a `sessions` row with a 30-day expiry). Clients send it as `Authorization: Bearer <token>`; the server resolves it to a user id. The token is distinct from any resource id and is never returned inside resource payloads. No cookies, no JWT — appropriate for an anonymous funnel with no login, while still being revocable and expiring.
 
-Unified error body: `{ "error": { "code": "string", "message": "string" } }`
+An interactive **OpenAPI 3.1 / Swagger UI** is served at `/api/v1/docs` (spec at `/api/v1/openapi.json`), generated from the same Zod schemas the API validates against.
+
+Unified error body: `{ "error": { "code": "string", "message": "string" }, "request_id": "string" }`. Validation errors additionally carry `error.fields: [{ path, message }]` covering **every** invalid field, not just the first.
 
 ### Endpoints
 
@@ -300,39 +301,41 @@ Unified error body: `{ "error": { "code": "string", "message": "string" } }`
 |---|---|---|---|---|
 | 0 | GET | `/api/health` | None | Liveness check: API process responds |
 | 0 | GET | `/api/ready` | None | Readiness check: API can query Postgres |
-| 1 | POST | `/api/assessments` | None | Create anonymous user + assessment |
-| 2 | GET | `/api/assessments/:id` | x-user-id (ownership) | Recover progress |
-| 3 | PATCH | `/api/assessments/:id` | x-user-id (ownership) | Incremental step save |
-| 4 | POST | `/api/assessments/:id/submit` | x-user-id (ownership) | Compute + persist result |
-| 5 | GET | `/api/assessments/:id/result` | x-user-id (ownership + subscription) | Fetch result (masked vs full) |
-| 6 | POST | `/api/pay` | x-user-id must equal body.userId | Activate subscription |
+| 1 | POST | `/api/v1/assessments` | None | Create anonymous user + assessment, issue token |
+| 2 | GET | `/api/v1/assessments/:id` | Bearer (ownership) | Recover progress |
+| 3 | PATCH | `/api/v1/assessments/:id` | Bearer (ownership) | Incremental step save |
+| 4 | POST | `/api/v1/assessments/:id/submit` | Bearer (ownership) | Compute + persist result |
+| 5 | GET | `/api/v1/assessments/:id/result` | Bearer (ownership + subscription) | Fetch result (masked vs full) |
+| 6 | DELETE | `/api/v1/assessments/:id` | Bearer (ownership) | Delete assessment + derived data (GDPR) |
+| 7 | POST | `/api/v1/pay` | Bearer (ownership) | Activate subscription |
 
 ---
 
-### 1. POST /api/assessments
+### 1. POST /api/v1/assessments
 
-Creates a new anonymous user and assessment. No body required.
+Creates a new anonymous user and assessment, and issues a session token. No body required.
 
 **Response 201:**
 ```json
 {
-  "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
+  "token": "b1c9…<64 hex chars>",
   "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
   "currentStep": 0
 }
 ```
 
+Store the `token` and send it as `Authorization: Bearer <token>` on every subsequent call.
+
 ---
 
-### 2. GET /api/assessments/:id
+### 2. GET /api/v1/assessments/:id
 
-Returns current progress for resume. Requires `x-user-id` header matching the assessment owner.
+Returns current progress for resume. Requires a `Authorization: Bearer` token owned by the assessment. The response deliberately does **not** include `userId`.
 
 **Response 200:**
 ```json
 {
   "assessmentId": "ef0e9e76-...",
-  "userId": "8404579c-...",
   "gender": "female",
   "primary_goal": "lose_weight",
   "age": 28,
@@ -345,13 +348,13 @@ Returns current progress for resume. Requires `x-user-id` header matching the as
 }
 ```
 
-**Errors:** `403 FORBIDDEN` (wrong x-user-id), `404 NOT_FOUND`
+**Errors:** `401 UNAUTHORIZED` (missing/invalid/expired token), `403 FORBIDDEN` (token owned by another user), `404 NOT_FOUND`
 
 ---
 
-### 3. PATCH /api/assessments/:id
+### 3. PATCH /api/v1/assessments/:id
 
-Saves one or more fields incrementally. All fields are optional (partial update). Each field is validated against the shared Zod schema — invalid values return 400.
+Saves one or more fields incrementally. All fields are optional (partial update). Each field is validated against the shared Zod schema — invalid values return 400 with **all** offending fields listed.
 
 **Request body (any subset):**
 ```json
@@ -373,11 +376,11 @@ Saves one or more fields incrementally. All fields are optional (partial update)
 
 **Response 200:** updated progress object (same shape as GET).
 
-**Errors:** `400 VALIDATION_ERROR`, `403 FORBIDDEN`, `404 NOT_FOUND`
+**Errors:** `400 VALIDATION_ERROR`, `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 NOT_FOUND`
 
 ---
 
-### 4. POST /api/assessments/:id/submit
+### 4. POST /api/v1/assessments/:id/submit
 
 Triggers server-side health algorithm using the stored assessment fields. All fields must be present (validated via `submitSchema`) or returns 400. Persists an `assessment_result` row and marks assessment `completed`.
 
@@ -388,11 +391,11 @@ Triggers server-side health algorithm using the stored assessment fields. All fi
 { "status": "completed" }
 ```
 
-**Errors:** `400 INCOMPLETE` (missing required fields or invalid numeric values), `403 FORBIDDEN`, `404 NOT_FOUND`
+**Errors:** `400 INCOMPLETE` (missing required fields or invalid numeric values), `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 NOT_FOUND`
 
 ---
 
-### 5. GET /api/assessments/:id/result
+### 5. GET /api/v1/assessments/:id/result
 
 Returns the computed result. Shape differs by subscription status.
 
@@ -425,22 +428,31 @@ Returns the computed result. Shape differs by subscription status.
 
 The fields `daily_calorie_intake` and `target_date` are **never** sent to non-members — they are stripped in `lib/serializers.ts` on the server before the response is built.
 
-**Errors:** `403 FORBIDDEN`, `404 NOT_FOUND` (result not yet computed — call /submit first)
+**Errors:** `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 NOT_FOUND` (result not yet computed — call /submit first)
 
 ---
 
-### 6. POST /api/pay
+### 6. DELETE /api/v1/assessments/:id
 
-Simulates a successful checkout callback that activates the user's subscription. It is still a mock provider, but the flow mirrors a production payment integration: the backend verifies ownership, records a payment row with provider metadata, uses an idempotency key to prevent duplicate charges, and activates the subscription in the same transaction.
+Permanently deletes an assessment and everything derived from it (payments, computed result) in a single transaction. Demonstrates a GDPR "right to erasure" path.
 
-The `x-user-id` header **must equal** `body.userId`, and `body.assessmentId` must belong to that same user — a mismatch returns 403.
+**Response 204:** no content.
+
+**Errors:** `401 UNAUTHORIZED`, `403 FORBIDDEN`, `404 NOT_FOUND`
+
+---
+
+### 7. POST /api/v1/pay
+
+Simulates a successful checkout callback that activates the user's subscription. It is still a mock provider, but the flow mirrors a production payment integration: the backend derives the user from the bearer token, verifies ownership of the assessment, records a payment row with provider metadata, uses an idempotency key to prevent duplicate charges, and activates the subscription in the same transaction.
+
+The user is taken from the authenticated token — the request body only carries `assessmentId` (which must belong to that user) and an optional `idempotencyKey`. A mismatch returns 403.
 
 The endpoint is idempotent for an already-active subscription: repeated calls return `active` with the existing succeeded payment, without rewriting the original activation timestamp or payment reference.
 
 **Request body:**
 ```json
 {
-  "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
   "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
   "idempotencyKey": "checkout_attempt_1"
 }
@@ -461,7 +473,7 @@ The endpoint is idempotent for an already-active subscription: repeated calls re
 }
 ```
 
-**Errors:** `400 VALIDATION_ERROR` (invalid UUID), `400 IDEMPOTENCY_CONFLICT` (key reused for another checkout), `403 FORBIDDEN` (x-user-id ≠ body.userId or assessment owner mismatch), `404 NOT_FOUND` (user/subscription/assessment not found)
+**Errors:** `400 VALIDATION_ERROR` (invalid UUID), `400 IDEMPOTENCY_CONFLICT` (key reused for another checkout), `401 UNAUTHORIZED`, `403 FORBIDDEN` (assessment owner mismatch), `404 NOT_FOUND` (subscription/assessment not found)
 
 ---
 
@@ -469,12 +481,12 @@ The endpoint is idempotent for an already-active subscription: repeated calls re
 
 ```bash
 API="https://api.betterme.yesterhaze.codes"
+TOKEN="seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000"
 
-curl -X POST "$API/api/pay" \
+curl -X POST "$API/api/v1/pay" \
   -H "content-type: application/json" \
-  -H "x-user-id: 8404579c-776a-44ec-a2fe-74389b54bcc1" \
+  -H "authorization: Bearer $TOKEN" \
   -d '{
-    "userId": "8404579c-776a-44ec-a2fe-74389b54bcc1",
     "assessmentId": "ef0e9e76-0322-45af-89cc-f4b785c7b264",
     "idempotencyKey": "manual-demo-replay"
   }'
@@ -484,10 +496,10 @@ curl -X POST "$API/api/pay" \
 
 ## Prepaid Test Session
 
-The seed script creates a user with an already-active subscription and a completed assessment. Use these IDs to test both masked and full result paths without running through the funnel.
+The seed script creates a user with an already-active subscription, a completed assessment, and a **stable demo session token**. Use these to test both masked and full result paths without running through the funnel.
 
 ```
-PAID_TEST_USER_ID     = 8404579c-776a-44ec-a2fe-74389b54bcc1
+PAID_TEST_TOKEN         = seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000
 PAID_TEST_ASSESSMENT_ID = ef0e9e76-0322-45af-89cc-f4b785c7b264
 ```
 
@@ -496,39 +508,53 @@ PAID_TEST_ASSESSMENT_ID = ef0e9e76-0322-45af-89cc-f4b785c7b264
 ```bash
 API="https://api.betterme.yesterhaze.codes"
 AID="ef0e9e76-0322-45af-89cc-f4b785c7b264"
-UID="8404579c-776a-44ec-a2fe-74389b54bcc1"
+TOKEN="seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000"
 
 # Member (paid) — returns daily_calorie_intake + target_date
-curl "$API/api/assessments/$AID/result" -H "x-user-id: $UID"
+curl "$API/api/v1/assessments/$AID/result" -H "authorization: Bearer $TOKEN"
 
-# Non-member — create a SINGLE fresh session, capture both IDs from that one response
-NEW_RESP=$(curl -s -X POST "$API/api/assessments")
+# Non-member — create a SINGLE fresh session, capture token + assessmentId from that one response
+NEW_RESP=$(curl -s -X POST "$API/api/v1/assessments")
 NEW=$(echo "$NEW_RESP" | jq -r '.assessmentId')
-NEW_UID=$(echo "$NEW_RESP" | jq -r '.userId')
+NEW_TOKEN=$(echo "$NEW_RESP" | jq -r '.token')
 # fill funnel steps + submit
-curl -s -X PATCH "$API/api/assessments/$NEW" \
-  -H "content-type: application/json" -H "x-user-id: $NEW_UID" \
+curl -s -X PATCH "$API/api/v1/assessments/$NEW" \
+  -H "content-type: application/json" -H "authorization: Bearer $NEW_TOKEN" \
   -d '{"gender":"female","primary_goal":"lose_weight","age":28,"height_cm":165,"weight_kg":70,"target_weight_kg":75,"workout_frequency":"light","current_step":13}'
-curl -s -X POST "$API/api/assessments/$NEW/submit" -H "x-user-id: $NEW_UID"
+curl -s -X POST "$API/api/v1/assessments/$NEW/submit" -H "authorization: Bearer $NEW_TOKEN"
 # GET result as non-member: locked === true, daily_calorie_intake is absent
-curl "$API/api/assessments/$NEW/result" -H "x-user-id: $NEW_UID"
+curl "$API/api/v1/assessments/$NEW/result" -H "authorization: Bearer $NEW_TOKEN"
 ```
 
 ---
 
 ## Launch Readiness
 
-Current status: suitable for an interviewer demo or private staging deployment. The core flow is covered by unit, integration, component, and browser E2E tests.
+Current status: suitable for an interviewer demo or private staging deployment. The core flow is covered by unit, integration, component, and browser E2E tests, and the backend now ships with production-grade guardrails.
 
-Before a real public launch:
+**In place after the enterprise hardening pass:**
 
-| Area | Current demo implementation | Production requirement |
-|---|---|---|
-| Auth | Anonymous UUID in `localStorage` + `x-user-id` | Real auth provider, token validation, session expiry, user deletion/export path |
-| Payment | Mock `/api/pay` provider with payment records, idempotency key, amount/currency/status, transactional subscription activation | Stripe/Creem/Paddle Checkout, signed webhook verification, refund/cancel states, provider reconciliation |
-| Medical safety | BMI/calorie estimate + health disclaimer | Stronger disclaimers, contraindication screening, escalation copy for unsafe inputs |
-| Operations | Local logs + GitHub CI | Request logging, error tracking, uptime checks, DB backup/restore playbook |
-| Abuse/rate limits | Ownership checks + validation | API rate limiting and bot protection |
+| Area | Implementation |
+|---|---|
+| Auth | Capability token (opaque, unguessable, 30-day expiry, revocable) sent as `Authorization: Bearer`; token is never a resource id and never returned in payloads |
+| API surface | Versioned under `/api/v1`; machine-readable OpenAPI 3.1 + Swagger UI at `/api/v1/docs`, generated from the Zod contracts |
+| Observability | Structured JSON logging (pino), per-request `X-Request-Id`, one request log line each, and full server-side logging of unexpected 5xx (previously silent) |
+| Abuse controls | Per-IP rate limiting (general + stricter on create/pay), 16 KB request-body cap |
+| CORS | Explicit allow-list; production **refuses to boot** without `WEB_ORIGIN` (no wildcard fallback) |
+| Validation | Every invalid field returned at once (`error.fields`), not just the first |
+| Compliance | `DELETE /assessments/:id` erases an assessment and its derived data (GDPR right-to-erasure) |
+| Delivery | Reproducible `apps/api/Dockerfile`; CI runs lint, typecheck, API build, tests, dependency audit, and a core-algorithm coverage gate; Dependabot for npm + Actions |
+
+**Roadmap before a real public launch:**
+
+| Area | Production requirement |
+|---|---|
+| Payment | Stripe/Creem/Paddle Checkout, signed webhook verification, refund/cancel states, provider reconciliation (currently a mock `/pay`) |
+| Auth identity | A real login/identity provider if the product needs accounts beyond anonymous sessions |
+| Concurrency | Optimistic locking (`version` column) if disjoint-field last-write-wins is ever insufficient — the `GREATEST(current_step)` guard already covers the real race |
+| Data lifecycle | Scheduled cleanup of abandoned assessments / expired sessions (a `scripts/cleanup-abandoned.ts` job driven by the platform scheduler) |
+| Error tracking | External tracker (Sentry) wired into the existing logger hook; DB backup/restore playbook |
+| Medical safety | Stronger disclaimers, contraindication screening, escalation copy for unsafe inputs |
 
 The current demo deployment uses Supabase Postgres + Railway API + Cloudflare Pages frontend, with `VITE_API_BASE=https://api.betterme.yesterhaze.codes` and `WEB_ORIGIN=https://betterme-4j4.pages.dev,https://betterme.yesterhaze.codes`.
 
@@ -591,20 +617,18 @@ curl https://api.betterme.yesterhaze.codes/api/ready
 
 ---
 
-### Backend — Cloudflare Workers (OPTIONAL ALTERNATIVE)
+### Backend — Docker (portable alternative)
 
-> **Requires your Cloudflare account and `wrangler login`.**
+A reproducible image is provided at `apps/api/Dockerfile` (build from the repo root):
 
-Workers deployment requires additional Prisma configuration (driver adapter). See `apps/api/wrangler.toml` for the complete step-by-step notes.
+```bash
+docker build -f apps/api/Dockerfile -t betterme-api .
+docker run -p 8787:8787 \
+  -e DATABASE_URL=... -e DIRECT_URL=... -e WEB_ORIGIN=... \
+  betterme-api
+```
 
-**Summary of extra steps:**
-1. Add `previewFeatures = ["driverAdapters"]` to `schema.prisma` generator.
-2. `pnpm --filter @betterme/api add @prisma/adapter-pg pg`
-3. Update `apps/api/src/lib/prisma.ts` to use `PrismaPg` adapter with the Supabase pooler (`:6543`).
-4. Set secrets: `wrangler secret put DATABASE_URL` and `wrangler secret put DIRECT_URL`.
-5. `pnpm --filter @betterme/api exec wrangler deploy`
-
-> The Node-host path is recommended because it avoids adapter complexity and keeps the test suite running against exactly the same code path.
+> Migrations are applied by the platform's pre-deploy step (`prisma migrate deploy`), not at container start.
 
 ---
 
@@ -652,7 +676,11 @@ See `apps/web/wrangler.toml` for reference build settings.
 | Concurrent PATCH requests merge fields and keep the highest `current_step` | Integration | same | Proves the persistence layer handles overlapping saves instead of only sequential requests |
 | Duplicate PATCH (same step twice) | Integration | same | Idempotency requirement |
 | Invalid field value → 400 | Integration | same | Error path coverage |
-| Cross-user access → 403 | Integration | same | Authorization must be tested, not just documented |
+| Validation returns every offending field | Integration | same | `error.fields` lists all failures, not just the first |
+| Missing / invalid / expired token → 401 | Integration | same | Capability-token auth: unauthenticated and stale tokens are rejected |
+| Cross-user access with a valid but foreign token → 403 | Integration | same | Authorization must be tested, not just documented |
+| Create response never leaks `userId` | Integration | same | Token is the only credential; resource-owner id stays server-side |
+| Delete assessment + derived data (GDPR) → 204, then 404 | Integration | same | Right-to-erasure path removes payments, result, and assessment |
 | Non-existent assessment → 404 | Integration | same | Standard error paths |
 | Submit computes + persists correct BMI | Integration | `api/tests/integration/submit.spec.ts` | Verifies algorithm is actually called and result stored |
 | Submit with incomplete data → 400 | Integration | same | Guards against submitting before all fields are filled |
@@ -662,6 +690,7 @@ See `apps/web/wrangler.toml` for reference build settings.
 | Repeated /pay is idempotent | Integration | same | Prevents duplicate demo activation from rewriting subscription metadata |
 | Mock payment record is stored once per checkout attempt | Integration | same | Keeps simulated payment close to real provider semantics: payment row, provider ref, amount, currency, idempotency |
 | /pay rejects assessment owner mismatch | Integration | same | Prevents one user from unlocking against another user's assessment |
+| /pay without a token → 401 | Integration | same | Payment requires an authenticated session |
 | Session localStorage round-trip | Component | `web/tests/session.spec.ts` | session.ts is used by every API call |
 | Funnel starts with Pilates interest, auto-advances choices, and asks body data one field at a time | Component | `web/tests/funnel.spec.tsx` | Guards the low-pressure UX for the 5-stage flow |
 | Result page: pending generation, local preview, pay → full result | Component | `web/tests/result.spec.tsx` | Validates the slow-backend fallback, masked local preview, and backend-confirmed unlock flow |
@@ -675,7 +704,6 @@ See `apps/web/wrangler.toml` for reference build settings.
 | Not covered | Reason |
 |---|---|
 | Real payment processing | Out of scope — `/pay` is a mock callback. A real integration would require a payment provider sandbox and test cards. |
-| Real user authentication / login | The system uses anonymous sessions (UUID in localStorage). A real auth system (OAuth, JWT rotation) is explicitly out of scope per the challenge spec. |
+| Real user authentication / login | The system uses anonymous capability tokens (opaque token in `localStorage`, `sessions` row with expiry). A full identity provider (OAuth, account login) is out of scope for an anonymous funnel. |
 | Load testing | No k6/Artillery-style throughput test — beyond the 3-day challenge scope. The key stale-save race is covered by integration tests. |
 | Playwright tests in CI | E2E tests require two live servers and a seeded DB. CI runs unit + integration only; E2E is run manually or in a dedicated staging environment. |
-| Workers-path integration tests | The Cloudflare Workers deployment path (worker.ts + Prisma adapter) is intentionally not tested in the main suite to avoid coupling the test path to the adapter. |

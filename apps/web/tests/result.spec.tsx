@@ -35,7 +35,7 @@ const paymentResponse = {
 };
 
 beforeEach(() => {
-  localStorage.setItem('bm_user_id', 'u1');
+  localStorage.setItem('bm_token', 't1');
   localStorage.setItem('bm_assessment_id', 'a1');
   sessionStorage.clear();
   const getResult = vi.spyOn(client.api, 'getResult');
@@ -43,7 +43,6 @@ beforeEach(() => {
   getResult.mockResolvedValueOnce(fullResponse);
   vi.spyOn(client.api, 'getProgress').mockResolvedValue({
     assessmentId: 'a1',
-    userId: 'u1',
     gender: 'female',
     primary_goal: 'lose_weight',
     age: 28,
@@ -89,7 +88,6 @@ describe('ResultPage', () => {
     vi.mocked(client.api.getResult).mockResolvedValueOnce(maskedResponse);
     vi.spyOn(client.api, 'getProgress').mockResolvedValue({
       assessmentId: 'a1',
-      userId: 'u1',
       gender: 'female',
       primary_goal: 'lose_weight',
       age: 28,
@@ -129,7 +127,6 @@ describe('ResultPage', () => {
     vi.mocked(client.api.getResult).mockResolvedValueOnce(maskedResponse);
     vi.spyOn(client.api, 'getProgress').mockResolvedValue({
       assessmentId: 'a1',
-      userId: 'u1',
       gender: 'female',
       primary_goal: 'lose_weight',
       age: 28,
@@ -153,7 +150,6 @@ describe('ResultPage', () => {
     vi.mocked(client.api.getResult).mockReset();
     vi.spyOn(client.api, 'getProgress').mockResolvedValue({
       assessmentId: 'a1',
-      userId: 'u1',
       gender: 'female',
       primary_goal: 'lose_weight',
       age: 28,
@@ -182,7 +178,6 @@ describe('ResultPage', () => {
       }));
     vi.spyOn(client.api, 'getProgress').mockResolvedValue({
       assessmentId: 'a1',
-      userId: 'u1',
       gender: 'female',
       primary_goal: 'lose_weight',
       age: 28,
@@ -299,7 +294,7 @@ describe('ResultPage', () => {
     await waitFor(() => screen.getByRole('link', { name: /支付|解锁|pay/i }));
     fireEvent.click(screen.getByRole('button', { name: /重新开始|restart/i }));
 
-    expect(localStorage.getItem('bm_user_id')).toBeNull();
+    expect(localStorage.getItem('bm_token')).toBeNull();
     expect(localStorage.getItem('bm_assessment_id')).toBeNull();
     expect(sessionStorage.getItem('bm_assessment_snapshot')).toBeNull();
     expect(await screen.findByText(/Start page/i)).toBeTruthy();

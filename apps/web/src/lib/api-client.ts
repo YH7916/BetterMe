@@ -1,27 +1,27 @@
 import type { StepUpdate } from '@betterme/shared';
 import type { ProgressResponse } from '@betterme/shared';
 import type { ResultResponse } from '../features/result/types';
-import { getUserId } from './session';
+import { getToken } from './session';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 async function req<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
-  const uid = getUserId();
-  const res = await fetch(`${API_BASE}/api${path}`, {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/api/v1${path}`, {
     ...init,
-    headers: { 'content-type': 'application/json', ...(uid ? { 'x-user-id': uid } : {}), ...init.headers },
+    headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}), ...init.headers },
   });
   if (!res.ok) throw new Error(((await res.json()) as { error?: { message?: string } }).error?.message ?? 'request failed');
   return res.json() as Promise<T>;
 }
 
 export const api = {
-  createAssessment: () => req<{ userId: string; assessmentId: string; currentStep: number }>('/assessments', { method: 'POST' }),
+  createAssessment: () => req<{ token: string; assessmentId: string; currentStep: number }>('/assessments', { method: 'POST' }),
   getProgress: (id: string) => req<ProgressResponse>(`/assessments/${id}`),
   saveStep: (id: string, data: StepUpdate) => req<Record<string, unknown>>(`/assessments/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   submit: (id: string) => req<{ status: string }>(`/assessments/${id}/submit`, { method: 'POST' }),
   getResult: (id: string) => req<ResultResponse>(`/assessments/${id}/result`),
-  pay: (userId: string, assessmentId: string) => req<{
+  pay: (assessmentId: string) => req<{
     status: string;
     payment: {
       id: string;
@@ -31,5 +31,5 @@ export const api = {
       amount_cents: number;
       currency: string;
     } | null;
-  }>('/pay', { method: 'POST', body: JSON.stringify({ userId, assessmentId }) }),
+  }>('/pay', { method: 'POST', body: JSON.stringify({ assessmentId }) }),
 };

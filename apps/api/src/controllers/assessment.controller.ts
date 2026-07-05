@@ -11,7 +11,6 @@ type AppContext = Context<{ Variables: AppVariables }>;
 function toProgressDTO(a: NonNullable<Awaited<ReturnType<typeof assessmentService.getProgress>>>): ProgressResponse {
   return {
     assessmentId: a.id,
-    userId: a.userId,
     gender: a.gender,
     primary_goal: a.primaryGoal,
     age: a.age,
@@ -43,5 +42,9 @@ export const assessmentController = {
   async result(c: AppContext) {
     const assessment = c.get('assessment')!;
     return c.json(await resultService.getResult(c.req.param('id')!, assessment.userId));
+  },
+  async remove(c: AppContext) {
+    await assessmentService.remove(c.req.param('id')!);
+    return c.body(null, 204);
   },
 };

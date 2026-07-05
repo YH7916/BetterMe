@@ -2,7 +2,6 @@ import type { Gender, Goal, WorkoutFrequency } from '../enums';
 
 export interface ProgressResponse {
   assessmentId: string;
-  userId: string;
   gender: Gender | null;
   primary_goal: Goal | null;
   age: number | null;

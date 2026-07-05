@@ -1,7 +1,7 @@
 const API_BASE = (process.env.SMOKE_API_BASE ?? 'https://api.betterme.yesterhaze.codes').replace(/\/$/, '');
 const FRONTEND_URL = process.env.SMOKE_FRONTEND_URL ?? 'https://betterme.yesterhaze.codes';
 const TIMEOUT_MS = Number(process.env.SMOKE_TIMEOUT_MS ?? 10000);
-const PAID_TEST_USER_ID = process.env.PAID_TEST_USER_ID ?? '8404579c-776a-44ec-a2fe-74389b54bcc1';
+const PAID_TEST_TOKEN = process.env.PAID_TEST_TOKEN ?? 'seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000';
 const PAID_TEST_ASSESSMENT_ID = process.env.PAID_TEST_ASSESSMENT_ID ?? 'ef0e9e76-0322-45af-89cc-f4b785c7b264';
 
 const startedAt = Date.now();
@@ -42,10 +42,10 @@ async function fetchJson(path, options = {}, expectedStatus = 200) {
   return body;
 }
 
-function jsonHeaders(userId) {
+function jsonHeaders(token) {
   return {
     'content-type': 'application/json',
-    'x-user-id': userId,
+    authorization: `Bearer ${token}`,
   };
 }
 
@@ -83,12 +83,12 @@ async function checkReadiness() {
 }
 
 async function checkAssessmentFlow() {
-  const created = await fetchJson('/api/assessments', { method: 'POST' }, 201);
-  expect(created.userId, 'create assessment response missing userId');
+  const created = await fetchJson('/api/v1/assessments', { method: 'POST' }, 201);
+  expect(created.token, 'create assessment response missing token');
   expect(created.assessmentId, 'create assessment response missing assessmentId');
 
-  const headers = jsonHeaders(created.userId);
-  await fetchJson(`/api/assessments/${created.assessmentId}`, {
+  const headers = jsonHeaders(created.token);
+  await fetchJson(`/api/v1/assessments/${created.assessmentId}`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify({
@@ -106,24 +106,23 @@ async function checkAssessmentFlow() {
     expect(Number(patched.target_weight_kg) === 75, 'target weight above current weight was not persisted');
   });
 
-  const submit = await fetchJson(`/api/assessments/${created.assessmentId}/submit`, {
+  const submit = await fetchJson(`/api/v1/assessments/${created.assessmentId}/submit`, {
     method: 'POST',
     headers,
   });
   expect(submit.status === 'completed', 'submit did not complete');
 
-  const masked = await fetchJson(`/api/assessments/${created.assessmentId}/result`, { headers });
+  const masked = await fetchJson(`/api/v1/assessments/${created.assessmentId}/result`, { headers });
   expect(masked.member === false, 'fresh user should not be a member before pay');
   expect(masked.result?.locked === true, 'masked result should be locked');
   expect(typeof masked.result?.bmi === 'number', 'masked result missing bmi');
   expect(!('daily_calorie_intake' in masked.result), 'masked result leaked daily_calorie_intake');
   expect(!('target_date' in masked.result), 'masked result leaked target_date');
 
-  const pay = await fetchJson('/api/pay', {
+  const pay = await fetchJson('/api/v1/pay', {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      userId: created.userId,
       assessmentId: created.assessmentId,
       idempotencyKey: `smoke-${created.assessmentId}`,
     }),
@@ -134,16 +133,19 @@ async function checkAssessmentFlow() {
   expect(pay.payment?.amount_cents === 1900, 'pay did not return expected amount');
   expect(pay.payment?.currency === 'CNY', 'pay did not return expected currency');
 
-  const full = await fetchJson(`/api/assessments/${created.assessmentId}/result`, { headers });
+  const full = await fetchJson(`/api/v1/assessments/${created.assessmentId}/result`, { headers });
   expect(full.member === true, 'paid user should be a member');
   expect(typeof full.result?.daily_calorie_intake === 'number', 'full result missing daily_calorie_intake');
   expect(typeof full.result?.target_date === 'string', 'full result missing target_date');
   expect(full.result?.algorithm_version === 'v1', 'full result missing algorithm version');
+
+  // GDPR delete: the smoke user cleans up after itself.
+  await fetchJson(`/api/v1/assessments/${created.assessmentId}`, { method: 'DELETE', headers }, 204);
 }
 
 async function checkSeededPaidSession() {
-  const result = await fetchJson(`/api/assessments/${PAID_TEST_ASSESSMENT_ID}/result`, {
-    headers: { 'x-user-id': PAID_TEST_USER_ID },
+  const result = await fetchJson(`/api/v1/assessments/${PAID_TEST_ASSESSMENT_ID}/result`, {
+    headers: jsonHeaders(PAID_TEST_TOKEN),
   });
   expect(result.member === true, 'seeded paid session should be a member');
   expect(typeof result.result?.daily_calorie_intake === 'number', 'seeded paid session missing daily calories');

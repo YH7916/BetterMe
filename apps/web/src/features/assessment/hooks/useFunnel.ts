@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { StepData } from '../../../store/funnel';
 import { api } from '../../../lib/api-client';
-import { getUserId, getAssessmentId } from '../../../lib/session';
+import { getAssessmentId } from '../../../lib/session';
 import { ensureAssessmentSession } from '../assessment-session';
 import { saveAssessmentSnapshot } from '../assessment-snapshot';
 
@@ -62,7 +62,7 @@ export function useFunnel() {
         const existing = getAssessmentId();
         if (existing) {
           const p = await api.getProgress(existing);
-          const { assessmentId: _aid, userId: _uid, current_step, status: _st, ...stepFields } = p;
+          const { assessmentId: _aid, current_step, status: _st, ...stepFields } = p;
           if (_st === 'completed') {
             nav('/result');
             return;
@@ -118,5 +118,5 @@ export function useFunnel() {
     }
   }
 
-  return { step, data, ready, error, saveError, next, userId: getUserId() };
+  return { step, data, ready, error, saveError, next };
 }

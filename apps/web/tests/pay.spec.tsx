@@ -29,7 +29,7 @@ const fullResponse = {
 } as const;
 
 beforeEach(() => {
-  localStorage.setItem('bm_user_id', 'u1');
+  localStorage.setItem('bm_token', 't1');
   localStorage.setItem('bm_assessment_id', 'a1');
   sessionStorage.clear();
   sessionStorage.setItem('bm_assessment_snapshot', JSON.stringify({
@@ -74,7 +74,7 @@ describe('PayPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /确认支付|立即解锁/i }));
 
-    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('u1', 'a1'));
+    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('a1'));
     expect(await screen.findByText(/Unlocked result route/i)).toBeTruthy();
   });
 
@@ -95,7 +95,7 @@ describe('PayPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /确认支付|立即解锁/i }));
 
-    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('u1', 'a1'));
+    await waitFor(() => expect(client.api.pay).toHaveBeenCalledWith('a1'));
     await waitFor(() => expect(client.api.getResult).toHaveBeenCalledWith('a1'));
     expect(await screen.findByText('1680')).toBeTruthy();
   });

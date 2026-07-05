@@ -3,8 +3,10 @@ const prisma = new PrismaClient();
 
 const PAID_USER_ID = '8404579c-776a-44ec-a2fe-74389b54bcc1';
 const PAID_ASSESSMENT_ID = 'ef0e9e76-0322-45af-89cc-f4b785c7b264';
+const PAID_TOKEN = 'seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000';
 const PAID_PAYMENT_REF = 'seed-paid';
 const PAID_PAYMENT_IDEMPOTENCY_KEY = `seed_checkout:${PAID_USER_ID}:${PAID_ASSESSMENT_ID}`;
+const FAR_FUTURE = new Date('2999-01-01T00:00:00.000Z');
 
 async function main() {
   const now = new Date();
@@ -99,10 +101,15 @@ async function main() {
         currency: 'CNY',
       },
     });
+    await tx.session.upsert({
+      where: { token: PAID_TOKEN },
+      create: { token: PAID_TOKEN, userId: PAID_USER_ID, expiresAt: FAR_FUTURE },
+      update: { userId: PAID_USER_ID, expiresAt: FAR_FUTURE },
+    });
   });
 
   console.log('Seed demo session is ready.');
-  console.log('PAID_TEST_USER_ID=', PAID_USER_ID);
+  console.log('PAID_TEST_TOKEN=', PAID_TOKEN);
   console.log('PAID_TEST_ASSESSMENT_ID=', PAID_ASSESSMENT_ID);
   console.log('PAID_TEST_TARGET_DATE=', targetDate.toISOString().slice(0, 10));
 }
