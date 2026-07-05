@@ -28,7 +28,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test?schema=public
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/test?schema=public
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
