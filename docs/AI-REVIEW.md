@@ -1,130 +1,33 @@
-# AI Usage Retrospective — BetterMe 健康测评
+# AI 使用复盘 — BetterMe 健康测评
 
-> This document is a required deliverable for the 【睿迄科技】全栈开发 3 天挑战. It covers how AI assistance was used during the build, and — more importantly — where developer judgment overrode AI suggestions and why.
+> 本文档是【睿迄科技】全栈开发挑战的交付物之一：说明我如何与 AI 协作，以及哪些地方我否决了 AI 的方案、为什么。
 
-> **Note (post-challenge):** the repo later went through an enterprise-hardening pass. Some specifics below describe the original 3-day build — most notably the auth model, which was `x-user-id` then and is now an opaque capability token (`Authorization: Bearer`, backed by a `sessions` table). The reasoning captured here still holds; only the concrete mechanism evolved. See the root README for the current state.
+## 我的工作流程
 
----
+我不是把 AI 当"代码生成器"，而是当一个需要被我审核的搭档。整体节奏：
 
-## How AI Was Used
+1. **借助 skill 先规划**：用 superpowers 的 brainstorming / 写计划等 skill，先把需求和边界聊清楚，产出一份实现计划，**先定代码结构再动手**（分层、模块边界、数据契约）。
+2. **测试驱动开发（TDD）**：核心逻辑先写测试再写实现，红→绿→重构；让 AI 补边界用例，我来判断哪些是真边界。
+3. **验收 AI 产出**：AI 写的每一段在合并前我都逐行过一遍，不对的当场否决或改（见下方三例）。
+4. **再打磨细节**：结构层面的优化，比如**路由与实现分离**（routes 只声明方法/路径/中间件，业务下沉到 service/repository）、**前后端分离**（monorepo + shared 包做单一契约）。
+5. **先后端、后前端**：先把后端骨架和测试做扎实，再补前端漏斗。
+6. **部署走 CLI**：`railway up` 部署 API、`wrangler pages deploy` 部署前端，全流程命令行完成。
 
-### Database Modeling
+## AI 在各环节的具体用法
 
-The initial schema design came from the challenge brief and a domain analysis of BetterMe-style quiz funnels. AI was used to sanity-check the table layout — specifically to challenge the decision to store raw inputs (`assessments`) separately from computed outputs (`assessment_results`) rather than writing computed fields back into the assessments table.
+- **数据库建模**：让 AI 复核表结构，确认「原始录入（`assessments`）与算法结果（`assessment_results`）分表」是对的，并采纳了它加 `algorithm_version` 做前向兼容的建议；Prisma schema 由描述生成后我逐字段过，健康数据坚持用 `Decimal` 而非 `Float`。
+- **生成 Mock / 种子数据**：与 AI 合写 seed，约束是「幂等、不干扰测试隔离」，最终用固定 UUID + 存在即跳过。
+- **复杂逻辑**：Mifflin-St Jeor 算法先让 AI 起草，我补齐取整与目标调整等细节后再写测试。
+- **测试与边界**：让 AI 头脑风暴「真实用户会怎么把分步保存搞坏」，产出了乱序 PATCH、重复提交、并发更新等用例，我再收紧断言。
 
-The AI confirmed that separating raw data from derived data is the correct pattern: it allows the algorithm to be re-run (e.g. when `algorithm_version` changes) without touching user-provided data. It also suggested adding `algorithm_version` to `assessment_results` as a forward-compatibility field, which was incorporated.
+## 我否决 AI 的三次
 
-AI also suggested generating the Prisma schema from the plain-English table descriptions, which saved time on boilerplate. The output was reviewed field-by-field before committing — notably the `Decimal` vs `Float` choice for `bmi`/`height_cm`/`weight_kg` was kept as `Decimal` (more appropriate for health data than floating-point).
+**(1) 否决 `deleteMany()` 清库式测试重置。** AI 给的 `resetDb()` 无条件清空所有表——在本地没问题，但测试与演示种子数据同在一个 Supabase 项目，一跑就会把预付演示会话抹掉。我改成**独立 `test` schema 隔离**，`.env.test` 指向 `?schema=test`，`public` 的种子数据完全不受影响。
 
-### Mock / Seed Data
+**(2) 否决 JWT，改用能力令牌。** 加固鉴权时 AI 倾向上 JWT + Cookie。但这是个**没有登录的匿名漏斗**，JWT 里没有真实身份可装，纯属为"显得企业级"增加复杂度。我选了语义更正确的**能力令牌**：`sessions` 表存不可猜、可过期、可吊销的 token，凭证与资源 ID 解耦。选对模型比选重模型更重要。
 
-The seed file was co-authored with AI. The key constraint given to the AI was: _the seed must be idempotent and must not interfere with test isolation_. AI initially suggested a `deleteMany` / `createMany` pattern (i.e. clear-and-repopulate). This was rejected (see §Override (a) below) in favour of a deterministic approach using fixed, documented UUIDs.
+**(3) 否决"放松断言"来让脱敏测试变绿。** 非会员脱敏的 E2E 断言一度失败，AI 的直觉是把选择器放宽。我坚持先查原因——发现是选择器误匹配了 Paywall 的文案，脱敏其实是对的。我把断言改为校验**真正的秘密值**（具体卡路里数字）而非 UI 文案，反而更严格。放松断言会把真 bug 藏起来。
 
-The seed defines two top-level constants:
-```ts
-const PAID_USER_ID = '8404579c-776a-44ec-a2fe-74389b54bcc1';
-const PAID_ASSESSMENT_ID = 'ef0e9e76-0322-45af-89cc-f4b785c7b264';
-```
+## 小结
 
-The idempotency guard uses `prisma.user.findUnique({ where: { id: PAID_USER_ID } })`. If the row is found, the seed prints the two IDs and exits without creating anything. On a blank database, the user and assessment are created with those exact IDs as explicit `id` values.
-
-This means the documented cURL examples and README credentials are stable: a fresh `db:seed` on any self-hosted Supabase project produces the same IDs every time. The live `public` schema already contains these rows, so re-running `db:seed` is always a no-op (finds existing → exits).
-
-### Complex Logic: Health Algorithm
-
-The Mifflin-St Jeor formula is well-documented but has several tricky details: the sex constant offset (+5 for male, -161 for female), the activity multiplier table, and the goal-adjust step. AI was used to draft the initial implementation of `calcDailyCalories` in `packages/shared/src/health/calorie.ts`.
-
-The AI-generated draft was correct for the happy path but did not handle:
-- Integer rounding of the final calorie value (`Math.round`) — important so the API returns `1680` not `1679.6...`
-- The `GOAL_ADJUST` lookup being a separate constant vs inline arithmetic
-
-Both were refined before the tests were written. The boundary test suite (`packages/shared/tests/health.spec.ts`) was partially AI-generated — AI was prompted with "write edge cases for a BMI calculator" and produced the zero-height throw test and the 18.5/25 boundary assertions, which were directly useful.
-
-### Test Generation and Boundary Cases
-
-AI was heavily used to expand the test suite beyond the obvious happy-path assertions. Specifically:
-- The "out-of-order PATCH" test (step 2 saved before step 1) was suggested by AI after being asked "what are realistic browser navigation scenarios that could break a step-save flow?"
-- The "duplicate PATCH" idempotency test came from the same prompt.
-- The 403 cross-user access test structure was AI-suggested, though the specific assertion (`expect(res.status).toBe(403)` on a real ownership check) was refined manually.
-- For the masking test, AI initially proposed asserting `body.result.daily_calorie_intake === undefined` only. The more rigorous assertion (also checking `target_date` is absent and `locked === true` is present) was a manual addition.
-
----
-
-## Three Times I Overrode the AI
-
-### (a) Test isolation: the `deleteMany()` wipe problem
-
-**What AI suggested:** When the integration test scaffolding was drafted in Tasks 6–9, the plan's `resetDb()` helper used:
-```ts
-await prisma.assessmentResult.deleteMany();
-await prisma.assessment.deleteMany();
-await prisma.subscription.deleteMany();
-await prisma.user.deleteMany();
-```
-This was the AI's natural "clear the slate before each test" pattern — and it _would_ work in a local test database. The problem: the plan described running these tests against the same Supabase project that holds the demo seed data (with the prepaid `PAID_TEST_USER_ID` and `PAID_TEST_ASSESSMENT_ID`). A `deleteMany()` with no `where` clause would cascade-delete all rows in the `public` schema, wiping the seed on the first test run.
-
-**Why I overrode it:** The seed data is a delivery requirement — the evaluator needs to call `GET /api/assessments/ef0e9e76.../result` with the prepaid credentials and see a full member result. If tests wipe the seed, the delivery is broken in a way that is invisible at commit time but devastating at evaluation time.
-
-**What I did instead (T5b):** Introduced a dedicated `test` schema in Supabase. The `apps/api/.env.test` file points `DATABASE_URL` at `?schema=test`, and `vitest.config.ts` loads `.env.test` before any test runs. `resetDb()` calls `deleteMany()` freely — but against the `test` schema, which has zero seed data. The `public` schema's seed rows are completely isolated and survive the entire test suite. CI also uses its own throwaway Postgres service, so there was never a risk there.
-
-This was caught before a single integration test was committed. The override required writing a setup script (`scripts/setup-test-schema.ts`), adding `dotenv` loading to `vitest.config.ts`, and documenting the two-schema setup in the README.
-
----
-
-### (b) The /pay authorization gap
-
-**What AI suggested:** The initial `paymentController` implementation (drafted in Task 9) read `userId` directly from the request body and called `subscriptionService.pay(userId)`:
-```ts
-async pay(c: Context) {
-  const { userId } = c.get('body') as PayRequest;
-  return c.json(await subscriptionService.pay(userId));
-}
-```
-This was a textbook authorization bug: any caller who knew another user's UUID could POST `{ userId: <victim>, assessmentId: <any> }` and activate the victim's subscription (or in a real system, charge their payment method).
-
-**Why I overrode it:** The `x-user-id` header is the caller's identity. The body's `userId` is a request parameter. If those two differ, the request is either a cross-user attack or a client bug — either way it must be rejected. The AI's draft had no check between the two.
-
-**What I did instead (T9 fix):** Added a guard in the controller:
-```ts
-const callerUserId = c.req.header('x-user-id');
-const { userId } = c.get('body') as PayRequest;
-if (!callerUserId || callerUserId !== userId) {
-  throw AppError.forbidden('userId mismatch');
-}
-```
-This was also covered by an integration test asserting that a PATCH with a mismatched header returns 403. The fix was identified during the post-T9 code review pass before any commit was made.
-
----
-
-### (c) Weakening the E2E masking assertion
-
-**What AI suggested (instinct, not explicit output):** During Task 13 E2E development, the Playwright assertion for the masked (non-member) result page:
-```ts
-await expect(page.getByText(/每日建议摄入|daily/i)).not.toBeVisible();
-```
-was "failing" in a way that suggested the masked content was leaking. The immediate instinct (reinforced by an AI suggestion to "make the selector more flexible") was to weaken the assertion — e.g. look for the numeric calorie value instead, or remove the negative assertion entirely.
-
-**Why I investigated instead of weakening:** A failing negative assertion means either (a) the masking is broken — a real bug — or (b) the assertion selector is matching something it shouldn't. Weakening it would mask a real bug if (a) was true.
-
-**What I found:** The `Paywall` component's teaser copy contained the phrase `"升级会员查看每日建议摄入量与目标达成日期"` — which matched `/每日建议摄入/i`. The payload's `daily_calorie_intake` field was correctly absent from the API response. The masking was working; the selector was too broad.
-
-**What I did instead (T13):** Changed the discriminating assertion to check for the calorie _value_ (`kcal`) rather than the label text:
-```ts
-// Masked: the kcal value is absent
-await expect(page.getByText(/\d{3,4}\s*kcal/)).not.toBeVisible();
-// Full: after pay, kcal value appears
-await expect(page.getByText(/1680\s*kcal/)).toBeVisible();
-```
-This made the assertion precise: it now tests the actual secret data (the numeric value), not UI copy that the frontend is allowed to show to everyone. The masking guarantee is now rigorously verified by the E2E test, not just by the integration test suite.
-
----
-
-## Summary
-
-AI accelerated the boilerplate (Prisma schema, seed structure, formula implementation, test scaffolding) significantly — probably saving 4–6 hours across the 3-day build. But every AI output was reviewed before being committed, and the three overrides above represent cases where that review caught errors that would have been costly:
-
-- Override (a) would have silently destroyed the delivery demo data.
-- Override (b) introduced an authorization vulnerability that would have failed any security review.
-- Override (c) would have hidden a real masking bug behind a weakened test.
-
-The pattern that worked: use AI to draft, use tests and code review to verify, and be willing to investigate before weakening an assertion.
+AI 显著加速了样板代码（schema、seed、公式、测试脚手架），但价值在于「起草交给 AI、验证交给测试与我的 review」。上面三次否决，分别避免了：抹掉演示数据、引入过度设计、把真 bug 藏在被弱化的测试后面。
