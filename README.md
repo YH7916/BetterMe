@@ -4,7 +4,7 @@
 
 A full-stack health assessment quiz funnel inspired by the BetterMe challenge. Users step through a guided form, the backend persists progress for recovery, computes a personalised health plan server-side, and returns differentiated results based on subscription status (free users see a masked teaser; members get the full plan). A mock `/pay` endpoint simulates a production-style checkout callback with payment records, idempotency, and subscription activation.
 
-Design document: [`docs/superpowers/specs/2026-07-02-health-assessment-backend-design.md`](docs/superpowers/specs/2026-07-02-health-assessment-backend-design.md)
+Delivery summary: [`docs/DELIVERY.md`](docs/DELIVERY.md)
 
 ---
 
@@ -112,10 +112,10 @@ betterme/
 │       │   └── health/       # bmi.ts / calorie.ts / target-date.ts
 │       └── tests/
 ├── docs/
-│   ├── api/README.md         # Full API reference with example JSON
+│   ├── DELIVERY.md           # Delivery summary (tech stack + all deliverables)
+│   ├── api/README.md         # API reference (auth, errors, endpoints)
 │   ├── db/schema.md          # Mermaid ER diagram + field rationale
-│   ├── AI-REVIEW.md          # AI usage retrospective
-│   └── superpowers/specs/    # Design doc
+│   └── AI-REVIEW.md          # AI usage retrospective
 ├── .github/workflows/ci.yml
 ├── pnpm-workspace.yaml
 ├── tsconfig.base.json
