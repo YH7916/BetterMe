@@ -1,5 +1,0 @@
-- main [ref=f3e3]:
-  - generic [ref=f3e4]:
-    - paragraph [ref=f3e5]: 加载失败：请先完成测评 / Start assessment first
-    - link "重新开始 / Start assessment" [ref=f3e6] [cursor=pointer]:
-      - /url: /

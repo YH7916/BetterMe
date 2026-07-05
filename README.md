@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml/badge.svg)](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml)
 
-一个健康测评订阅产品的核心后端 + 可用前端漏斗：分步录入 → 进度恢复 → 服务端算法 → 按订阅状态差异化返回（非会员脱敏 / 会员完整）→ 模拟 `/pay` 激活订阅。
+一个健康测评订阅产品的核心后端 + 可用前端漏斗：分步录入 → 进度恢复 → 服务端算法 → 按订阅状态差异化返回（非会员脱敏 / 会员完整）→ 模拟 `/pay` 激活订阅。本文档即完整交付说明，无需翻阅其它文件。
 
 ---
 
@@ -56,6 +56,8 @@ pnpm test                              # 一键跑全部测试
 
 ## 五、API 接口
 
+统一约定：业务接口前缀 `/api/v1`；鉴权用 `Authorization: Bearer <token>`；统一错误体 `{ "error": { "code", "message" }, "request_id" }`，校验失败额外带 `error.fields` 列出**全部**非法字段。
+
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
 | POST | `/api/v1/assessments` | — | 创建会话 + 测评，返回 token |
@@ -66,7 +68,7 @@ pnpm test                              # 一键跑全部测试
 | DELETE | `/api/v1/assessments/:id` | Bearer | 删除测评及派生数据（GDPR）|
 | POST | `/api/v1/pay` | Bearer | 模拟支付，激活订阅 |
 
-完整请求/响应见 [Swagger](https://api.betterme.yesterhaze.codes/api/v1/docs) 或 [`docs/api/README.md`](docs/api/README.md)。
+完整请求/响应可在线调试：https://api.betterme.yesterhaze.codes/api/v1/docs
 
 ## 六、数据库 Schema
 
@@ -80,7 +82,15 @@ erDiagram
     assessments ||--o{ payments : "结账"
 ```
 
-六张表：用户 / 会话 / 测评 / 结果 / 订阅 / 支付。字段选择、索引与建模理由见 [`docs/db/schema.md`](docs/db/schema.md)。
+**六张表**
+- `users` — 匿名用户，仅 id + 时间戳，无账号 PII。
+- `sessions` — 能力令牌（`token` 唯一、`expires_at` 可过期），Bearer 鉴权来源。
+- `assessments` — 分步录入，字段可空以支持增量保存；`current_step` 支撑进度恢复。
+- `assessment_results` — 算法派生结果，与录入分表，带 `algorithm_version`。
+- `subscriptions` — 订阅，建号即建、默认 `inactive`，避免结果查询出现 nullable join。
+- `payments` — 模拟支付记录，`idempotency_key` / `provider_ref` 唯一。
+
+**建模要点**：健康数值用 `Decimal`（非 float）保精度；`assessment_results.assessment_id`、`subscriptions.user_id` 唯一约束保证 1:1；`sessions.token`、`payments.idempotency_key` 唯一索引；`sessions.user_id`、`assessments.user_id`、`payments` 建索引；支付创建与订阅激活在同一事务内完成。
 
 ## 七、测试与质量
 
@@ -91,4 +101,9 @@ erDiagram
 
 ## 八、AI 使用复盘
 
-见 [`docs/AI-REVIEW.md`](docs/AI-REVIEW.md)：如何用 AI 建模、生成测试与边界用例，以及「有没有一次 AI 的方案被我否决、为什么」。
+1. **借助 skill 先规划**：用 superpowers 的 brainstorming / 写计划等 skill，先把需求和边界聊清楚，产出一份实现计划，**先定代码结构再动手**（分层、模块边界、数据契约）。
+2. **测试驱动开发（TDD）**：核心逻辑先写测试再写实现，红→绿→重构；让 AI 补边界用例。
+3. **验收 AI 产出**：AI 写的东西逐段过一遍，不对就改（比如否决它给的 `deleteMany` 清库式测试重置，改用独立 `test` schema 隔离，避免抹掉演示数据）。
+4. **再打磨细节**：结构层面的优化，比如**路由与实现分离**（routes 只声明方法/路径/中间件，业务下沉到 service/repository）、**前后端分离**（monorepo + shared 包做单一契约）。
+5. **先后端、后前端**，力求各模块完全解耦。
+6. **部署走 CLI**：`railway up` 部署 API、`wrangler pages deploy` 部署前端，全流程命令行完成。
