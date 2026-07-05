@@ -1,34 +1,39 @@
-# BetterMe 健康测评系统
+# BetterMe 健康测评系统 · 全栈挑战交付
 
 [![CI](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml/badge.svg)](https://github.com/YH7916/BetterMe/actions/workflows/ci.yml)
 
-A full-stack health assessment quiz funnel inspired by the BetterMe challenge. Users step through a guided form, the backend persists progress for recovery, computes a personalised health plan server-side, and returns differentiated results based on subscription status (free users see a masked teaser; members get the full plan). A mock `/pay` endpoint simulates a production-style checkout callback with payment records, idempotency, and subscription activation.
+**交付人：李宇晗**　·　交付日期：2026-07-05
 
-Delivery summary: [`docs/DELIVERY.md`](docs/DELIVERY.md)
+A full-stack health assessment quiz funnel inspired by the BetterMe challenge. Users step through a guided form, the backend persists progress for recovery, computes a personalised health plan server-side, and returns differentiated results based on subscription status (free users see a masked teaser; members get the full plan). A mock `/pay` endpoint simulates a production-style checkout callback with payment records, idempotency, and subscription activation.
 
 ---
 
-## Live Delivery
+## 交付清单 · Delivery
 
-| Item | URL / Value |
+| 交付物 | 位置 |
 |---|---|
-| Frontend demo | https://betterme.yesterhaze.codes |
-| Frontend fallback | https://betterme-4j4.pages.dev |
-| API dashboard | https://api.betterme.yesterhaze.codes |
-| Backend API base | https://api.betterme.yesterhaze.codes/api/v1 |
-| API docs (Swagger) | https://api.betterme.yesterhaze.codes/api/v1/docs |
-| Health check | https://api.betterme.yesterhaze.codes/api/health |
-| Readiness check | https://api.betterme.yesterhaze.codes/api/ready |
-| GitHub repository | https://github.com/YH7916/BetterMe |
-| CI | https://github.com/YH7916/BetterMe/actions/workflows/ci.yml |
-| Production monitor | https://github.com/YH7916/BetterMe/actions/workflows/monitor.yml |
+| 线上演示（前端，可从头走一遍 funnel）| https://betterme.yesterhaze.codes |
+| 前端备用域名 | https://betterme-4j4.pages.dev |
+| API 控制台 | https://api.betterme.yesterhaze.codes |
+| API 文档（OpenAPI 3.1 / Swagger）| https://api.betterme.yesterhaze.codes/api/v1/docs |
+| 健康检查 / 就绪检查 | `/api/health` · `/api/ready` |
+| 代码仓库 | https://github.com/YH7916/BetterMe |
+| 一键测试 | `pnpm install && pnpm test`（shared 36 + web 36 + api 34 = 106 项）|
+| 测试覆盖说明 | 见下方 [Test Coverage](#test-coverage) |
+| CI（lint / typecheck / build / 测试 / 覆盖率门禁）| https://github.com/YH7916/BetterMe/actions/workflows/ci.yml |
+| 生产定时冒烟监控 | https://github.com/YH7916/BetterMe/actions/workflows/monitor.yml |
+| 数据库 Schema 图 | [docs/db/schema.md](docs/db/schema.md) |
+| API 文档（详版）| [docs/api/README.md](docs/api/README.md) · 或下方 [API Documentation](#api-documentation) |
+| AI 使用复盘 | [docs/AI-REVIEW.md](docs/AI-REVIEW.md) |
 
-Production paid demo credentials (send as `Authorization: Bearer <token>`):
+**已支付测试会话**（作为 `Authorization: Bearer <token>` 传入，可直接对比付费前后差异并重放 `/pay`）：
 
 ```bash
 PAID_TEST_TOKEN=seed-demo-token-0000000000000000000000000000000000000000000000000000000000000000
 PAID_TEST_ASSESSMENT_ID=ef0e9e76-0322-45af-89cc-f4b785c7b264
 ```
+
+`/pay` 可重放 cURL 见下方 [API Documentation](#api-documentation)；「新建会话 → 脱敏 → 支付 → 完整」完整对比脚本见 [Prepaid Test Session](#prepaid-test-session)。
 
 ---
 
@@ -112,7 +117,6 @@ betterme/
 │       │   └── health/       # bmi.ts / calorie.ts / target-date.ts
 │       └── tests/
 ├── docs/
-│   ├── DELIVERY.md           # Delivery summary (tech stack + all deliverables)
 │   ├── api/README.md         # API reference (auth, errors, endpoints)
 │   ├── db/schema.md          # Mermaid ER diagram + field rationale
 │   └── AI-REVIEW.md          # AI usage retrospective
