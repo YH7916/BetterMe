@@ -80,6 +80,47 @@ erDiagram
     users ||--o{ payments : "支付"
     assessments ||--o| assessment_results : "计算出"
     assessments ||--o{ payments : "结账"
+
+    users {
+        uuid id PK
+        timestamp created_at
+    }
+    sessions {
+        uuid id PK
+        string token UK
+        uuid user_id FK
+        timestamp expires_at
+    }
+    assessments {
+        uuid id PK
+        uuid user_id FK
+        enum gender
+        enum primary_goal
+        int current_step
+        enum status
+    }
+    assessment_results {
+        uuid id PK
+        uuid assessment_id FK
+        decimal bmi
+        int daily_calorie_intake
+        date target_date
+        string algorithm_version
+    }
+    subscriptions {
+        uuid id PK
+        uuid user_id FK
+        enum status
+        string plan
+    }
+    payments {
+        uuid id PK
+        uuid user_id FK
+        uuid assessment_id FK
+        string idempotency_key UK
+        int amount_cents
+        enum status
+    }
 ```
 
 **六张表**
